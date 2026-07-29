@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c15">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Зарплата: расчёт</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* ---- БАЗОВЫЕ СТИЛИ ---- */
+    :root {
+      --bg-body: #0b0c15;
+      --glass-bg: rgba(15, 16, 23, 0.65);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --text-main: #ffffff;
+      --text-secondary: #a0a5b0;
+      --accent-purple: #9d4edd;
+      --accent-hover: #b15ad6;
+      --input-bg: #1a1c26;
+      --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.35);
+      --radius-sm: 14px;
+      --radius-md: 20px;
+      --nav-height: 80px;
+    }
+
+    /* ---- ФОН ПРИЛОЖЕНИЯ ---- */
+    html, body {
+      background: var(--bg-body);
+      background-color: var(--bg-body);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      height: 100%;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-body);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ===== ГЛАВНЫЙ КОНТЕЙНЕР (БЕЗ НИЖНЕГО ОТСТУПА) ===== */
+    main {
+      background: transparent;
+      padding: 12px 16px 0 16px; /* убран padding-bottom */
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sections-wrapper {
+      background: transparent;
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ---- СКРОЛЛБАР НЕВИДИМ ---- */
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      background: transparent;
+    }
+    * {
+      scrollbar-width: none;
+    }
+
+    /* ===== СЕКЦИИ (ЗАНИМАЮТ 100% ВЫСОТЫ, БЕЗ НИЖНЕГО ОТСТУПА) ===== */
+    section {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%; /* честные 100% высоты экрана */
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 0 4px 0 4px; /* убран отступ снизу */
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      background: transparent;
+    }
+    section.active {
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 1;
+    }
+
+    /* ===== РАСПОРКА ВНИЗУ КАЖДОЙ СЕКЦИИ (НЕВИДИМЫЙ ОТСТУП) ===== */
+    .bottom-spacer {
+      height: calc(var(--nav-height) + 32px);
+      width: 100%;
+      background: transparent;
+      flex-shrink: 0;
+    }
+
+    h1 { 
+      font-size: clamp(26px, 5vw, 38px); 
+      margin-bottom: 4px; 
+      font-weight: 700; 
+    }
+    .subtitle { 
+      color: var(--text-secondary); 
+      font-size: clamp(16px, 2.5vw, 24px); 
+      margin-bottom: 12px; 
+    }
+
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: clamp(12px, 2vw, 24px) clamp(14px, 2.5vw, 28px);
+      margin-bottom: clamp(8px, 1.2vw, 16px);
+      box-shadow: var(--shadow-glass);
+      overflow: visible;
+      position: relative;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+      font-size: clamp(15px, 2vw, 22px);
+      font-weight: 500;
+    }
+
+    /* ---- ПОЛЯ ВВОДА ---- */
+    #tab-input input[type="text"],
+    #tab-settings input[type="text"] {
+      width: 100%;
+      padding: clamp(16px, 2.5vw, 28px) clamp(16px, 2.5vw, 28px);
+      background: var(--input-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: clamp(18px, 2.5vw, 28px);
+      min-height: clamp(56px, 8vw, 80px);
+      outline: none;
+      transition: all 0.2s ease;
+      appearance: none;
+    }
+    #tab-input input[type="text"]:focus,
+    #tab-settings input[type="text"]:focus {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 4px rgba(157, 78, 221, 0.25);
+    }
+
+    .hidden-field {
+      display: none !important;
+    }
+
+    /* ---- ТРИГГЕР ДЛЯ ДРОПДАУНА ---- */
+    .custom-select-trigger {
+      width: 100%;
+      padding: clamp(16px, 2.5vw, 28px) clamp(16px, 2.5vw, 28px);
+      background: var(--input-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: clamp(18px, 2.5vw, 28px);
+      min-height: clamp(56px, 8vw, 80px);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      z-index: 10;
+    }
+    .custom-select-trigger:focus {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 4px rgba(157, 78, 221, 0.25);
+    }
+    .custom-select-trigger .arrow {
+      font-size: clamp(20px, 2.5vw, 30px);
+      transition: transform 0.3s;
+    }
+    .custom-select-trigger .arrow.open {
+      transform: rotate(180deg);
+    }
+    .custom-select-trigger.small {
+      padding: clamp(6px, 1vw, 14px) clamp(10px, 1.5vw, 18px);
+      min-height: clamp(36px, 5vw, 52px);
+      font-size: clamp(16px, 2vw, 24px);
+    }
+
+    /* ---- ДРОПДАУН (ПОРТАЛ В BODY) ---- */
+    .dropdown-portal {
+      position: fixed;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 4px 0;
+      z-index: 99999;
+      min-width: 100px;
+      opacity: 0;
+      transform: translateY(-8px) scale(0.96);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+    .dropdown-portal.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+    .dropdown-portal .option {
+      padding: clamp(14px, 2vw, 24px) clamp(16px, 2.5vw, 28px);
+      font-size: clamp(16px, 2vw, 24px);
+      color: var(--text-secondary);
+      transition: background 0.15s, color 0.15s;
+      border-bottom: 1px solid var(--glass-border);
+      cursor: pointer;
+    }
+    .dropdown-portal .option:last-child {
+      border-bottom: none;
+    }
+    .dropdown-portal .option:hover {
+      background: rgba(255,255,255,0.05);
+      color: var(--text-main);
+    }
+    .dropdown-portal .option.selected {
+      color: var(--accent-purple);
+      background: rgba(157, 78, 221, 0.08);
+    }
+
+    /* ---- ТУМБЛЕР ---- */
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 15px;
+      cursor: pointer;
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+    .toggle-switch.active {
+      background: var(--accent-purple);
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+    .toggle-switch.active::after {
+      transform: translateX(22px);
+    }
+
+    /* ---- КНОПКИ ---- */
+    button:not(.nav-item):not(.action-btn):not(.btn-secondary) {
+      width: 100%;
+      padding: clamp(16px, 2.5vw, 28px);
+      background: var(--accent-purple);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: clamp(18px, 2.5vw, 28px);
+      cursor: pointer;
+      transition: transform 0.15s, background 0.2s, border-color 0.2s;
+      margin-top: 8px;
+    }
+    button:not(.nav-item):not(.action-btn):not(.btn-secondary):hover { background: var(--accent-hover); border-color: rgba(255,255,255,0.35); }
+    button:not(.nav-item):not(.action-btn):not(.btn-secondary):active { transform: scale(0.97); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      color: var(--text-secondary);
+      border: 2px solid rgba(255,255,255,0.12);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border-color: rgba(255,255,255,0.25);
+    }
+
+    /* ---- ВКЛАДКА "ВВОД" (прижатие полей вниз) ---- */
+    .bottom-group {
+      margin-top: auto;
+      width: 100%;
+      padding-bottom: 8px;
+    }
+    .bottom-group .card {
+      margin-bottom: 0;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      margin-top: clamp(10px, 1.5vw, 20px);
+      align-items: center;
+    }
+    .button-row .btn-calc {
+      flex: 2;
+      padding: clamp(16px, 2.5vw, 28px);
+      font-size: clamp(20px, 3vw, 34px);
+      background: var(--accent-purple);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, background 0.2s, border-color 0.2s;
+      margin: 0;
+    }
+    .button-row .btn-calc:hover { background: var(--accent-hover); border-color: rgba(255,255,255,0.35); }
+    .button-row .btn-calc:active { transform: scale(0.97); }
+
+    .button-row .btn-clear {
+      flex: 1;
+      padding: clamp(12px, 1.8vw, 22px);
+      font-size: clamp(16px, 2vw, 24px);
+      background: rgba(255,255,255,0.06);
+      color: var(--text-secondary);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      margin: 0;
+      white-space: nowrap;
+    }
+    .button-row .btn-clear:hover {
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border-color: rgba(255,255,255,0.2);
+    }
+    .button-row .btn-clear:active { transform: scale(0.97); }
+
+    /* ---- НАСТРОЙКИ ВЫПЛАТ ---- */
+    .settings-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: clamp(12px, 2vw, 24px) clamp(16px, 2.5vw, 32px);
+      align-items: center;
+    }
+    .settings-grid .setting-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings-grid .setting-item label {
+      margin-bottom: 0;
+      font-size: clamp(14px, 1.8vw, 22px);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* ---- НАСТРОЙКИ (список) ---- */
+    .settings-list .setting-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: clamp(12px, 1.8vw, 22px) 0;
+      border-bottom: 1px solid var(--glass-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .settings-list .setting-item:last-child {
+      border-bottom: none;
+    }
+    .settings-list .setting-item label {
+      margin-bottom: 0;
+      font-size: clamp(18px, 2.2vw, 28px);
+      font-weight: 500;
+    }
+    .settings-list .setting-item .setting-description {
+      font-size: clamp(14px, 1.6vw, 20px);
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .settings-list .setting-item input[type="text"] {
+      width: 100px;
+      padding: 8px 12px;
+      background: var(--input-bg);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: var(--radius-sm);
+      color: white;
+      font-size: clamp(16px, 1.8vw, 22px);
+      outline: none;
+      text-align: center;
+    }
+    .settings-list .setting-item input[type="text"]:focus {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 4px rgba(157, 78, 221, 0.25);
+    }
+
+    /* ---- ТОСТ ---- */
+    .toast {
+      position: fixed;
+      bottom: calc(var(--nav-height) + 30px);
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(20, 22, 32, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius-md);
+      padding: clamp(14px, 2vw, 24px) clamp(24px, 4vw, 48px);
+      color: white;
+      font-size: clamp(18px, 2.5vw, 28px);
+      font-weight: 500;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s;
+      z-index: 200;
+      pointer-events: none;
+      max-width: 90%;
+      text-align: center;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ---- РЕЗУЛЬТАТЫ И СТАТИСТИКА ---- */
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: clamp(12px, 1.8vw, 24px);
+      margin-bottom: 16px;
+    }
+    .stat-box {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: clamp(12px, 2vw, 24px);
+      text-align: center;
+      box-shadow: var(--shadow-glass);
+    }
+    .stat-label { 
+      color: var(--text-secondary); 
+      font-size: clamp(14px, 1.8vw, 22px); 
+    }
+    .stat-value { 
+      font-size: clamp(24px, 3.5vw, 44px); 
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(8px, 1.2vw, 16px);
+      margin-top: 12px;
+    }
+    .stats-grid .stat-box { padding: clamp(8px, 1.2vw, 16px); }
+
+    /* ---- ИСТОРИЯ ---- */
+    .history-item {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: clamp(14px, 2vw, 24px) clamp(16px, 2.5vw, 28px);
+      margin-bottom: clamp(10px, 1.5vw, 18px);
+      animation: slideIn 0.4s ease forwards;
+      position: relative;
+      box-shadow: var(--shadow-glass);
+    }
+    .history-date { 
+      color: var(--text-secondary); 
+      font-size: clamp(14px, 1.6vw, 20px); 
+      margin-bottom: 4px; 
+    }
+    .history-amount { 
+      font-weight: 700; 
+      color: var(--text-main); 
+      font-size: clamp(20px, 2.8vw, 36px); 
+    }
+    .history-tag {
+      display: inline-block;
+      background: rgba(157, 78, 221, 0.15);
+      color: var(--accent-purple);
+      font-size: clamp(13px, 1.4vw, 18px);
+      padding: 4px 14px;
+      border-radius: 16px;
+      margin-top: 4px;
+    }
+    .history-note {
+      font-size: clamp(14px, 1.6vw, 20px);
+      color: var(--text-secondary);
+      margin-top: 4px;
+      font-style: italic;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .history-actions button {
+      flex: 1;
+      padding: clamp(14px, 2vw, 24px) clamp(12px, 1.5vw, 20px);
+      font-size: clamp(16px, 2vw, 24px);
+      margin-top: 0;
+      min-width: 80px;
+      border: 2px solid rgba(255,255,255,0.12);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.06);
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .history-actions button:hover {
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border-color: rgba(255,255,255,0.25);
+    }
+
+    .action-btn {
+      position: absolute;
+      top: 12px;
+      background: transparent;
+      border: 2px solid rgba(255,255,255,0.12);
+      color: var(--text-secondary);
+      width: clamp(32px, 4vw, 48px);
+      height: clamp(32px, 4vw, 48px);
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: clamp(16px, 2vw, 24px);
+      line-height: clamp(32px, 4vw, 48px);
+      text-align: center;
+      opacity: 0.8;
+      padding: 0;
+      transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .action-btn:hover { opacity: 1; }
+    .edit-btn { right: 52px; }
+    .edit-btn:hover { color: var(--accent-purple); border-color: var(--accent-purple); }
+    .delete-btn { right: 12px; }
+    .delete-btn:hover { color: #ff4d4d; border-color: #ff4d4d; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    canvas#salaryChart {
+      width: 100% !important;
+      height: auto !important;
+      aspect-ratio: 16 / 9;
+      background: var(--glass-bg);
+      border-radius: var(--radius-md);
+      padding: 6px;
+      display: block;
+      max-height: 400px;
+    }
+
+    /* ===== НИЖНЕЕ МЕНЮ (ПАРЯЩИЙ ОВАЛ) ===== */
+    .nav-container-wrapper {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: calc(var(--nav-height) + 20px);
+      background: transparent !important;
+      z-index: 9999;
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      padding-bottom: 16px;
+      pointer-events: none; /* клики через уши */
+    }
+
+    .nav-container-oval {
+      pointer-events: auto; /* сам овал кликабелен */
+      width: 92%;
+      max-width: 500px;
+      margin: 0 auto;
+      background: #151622 !important;
+      border-radius: 24px;
+      box-shadow: var(--shadow-glass);
+      border: 1px solid var(--glass-border);
+      padding: 8px 0;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      transition: background 0.2s;
+    }
+
+    .nav-item {
+      color: var(--text-secondary);
+      text-align: center;
+      font-size: clamp(10px, 1.2vw, 14px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      cursor: pointer;
+      background: transparent !important;
+      border: none !important;
+      padding: 4px 12px;
+      transition: color 0.2s;
+      border-radius: 20px;
+      flex: 1;
+      max-width: 80px;
+    }
+    .nav-icon {
+      font-size: clamp(20px, 2.8vw, 30px);
+      line-height: 1;
+    }
+    .nav-item.active {
+      color: var(--accent-purple) !important;
+      background: transparent !important;
+    }
+
+    /* ---- СВЕТЛАЯ ТЕМА ---- */
+    body.light-theme .nav-container-oval {
+      background: #e8e8ec !important;
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+    }
+    body.light-theme .nav-item {
+      color: var(--text-secondary);
+    }
+    body.light-theme .nav-item.active {
+      color: var(--accent-purple) !important;
+    }
+
+    body.light-theme {
+      --bg-body: #f0f2f5;
+      --glass-bg: rgba(255, 255, 255, 0.75);
+      --glass-border: rgba(0, 0, 0, 0.08);
+      --text-main: #1a1c26;
+      --text-secondary: #4a4e5a;
+      --accent-purple: #7b3fbf;
+      --accent-hover: #5f2e99;
+      --input-bg: #ffffff;
+      --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.12);
+    }
+    body.light-theme .btn-secondary {
+      background: rgba(0,0,0,0.06);
+    }
+    body.light-theme .btn-secondary:hover {
+      background: rgba(0,0,0,0.1);
+    }
+    body.light-theme input,
+    body.light-theme .custom-select-trigger {
+      background: #ffffff;
+      border-color: rgba(0,0,0,0.08);
+      color: var(--text-main);
+    }
+    body.light-theme .dropdown-portal {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(20px);
+      border-color: rgba(0,0,0,0.08);
+    }
+    body.light-theme .dropdown-portal .option {
+      color: var(--text-secondary);
+      border-bottom-color: rgba(0,0,0,0.06);
+    }
+    body.light-theme .dropdown-portal .option:hover {
+      background: rgba(0,0,0,0.03);
+      color: var(--text-main);
+    }
+    body.light-theme .dropdown-portal .option.selected {
+      color: var(--accent-purple);
+      background: rgba(123, 63, 191, 0.08);
+    }
+    body.light-theme .toggle-switch {
+      background: rgba(0,0,0,0.15);
+    }
+    body.light-theme .toggle-switch.active {
+      background: var(--accent-purple);
+    }
+
+    .empty { 
+      text-align: center; 
+      padding: clamp(30px, 5vw, 80px) 16px; 
+      color: var(--text-secondary); 
+      font-size: clamp(18px, 2.5vw, 32px); 
+    }
+
+    .hidden-input { display: none; }
+
+    .stats-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .vacation-badge {
+      background: rgba(157, 78, 221, 0.12);
+      color: var(--accent-purple);
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: clamp(16px, 2vw, 24px);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 6px;
+      box-shadow: 0 4px 16px rgba(157, 78, 221, 0.2);
+    }
+    .vacation-badge span { font-size: clamp(20px, 2.5vw, 32px); }
+
+    @media (max-width: 480px) {
+      .result-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .stats-controls { flex-direction: column; }
+    }
+    @media (min-width: 600px) {
+      .result-grid { grid-template-columns: 1fr 1fr; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 900px) {
+      .result-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    @media (max-height: 700px) {
+      main { padding: 6px 10px 0 10px; }
+      .card { padding: 6px 10px; }
+      h1 { font-size: clamp(18px, 4vw, 24px); }
+      .subtitle { font-size: clamp(12px, 2vw, 16px); }
+    }
+    @media (max-height: 600px) {
+      main { padding: 4px 8px 0 8px; }
+      .card { padding: 4px 8px; }
+      h1 { font-size: clamp(14px, 3vw, 18px); }
+      .subtitle { font-size: clamp(10px, 1.5vw, 14px); }
+    }
+  </style>
+</head>
+<body>
+
+<main id="app-content">
+  <div class="sections-wrapper">
+    <!-- ===== ВКЛАДКА: ВВОД ===== -->
+    <section id="tab-input" class="active" role="tabpanel" aria-labelledby="nav-input">
+      <h1 id="form-title">Ввод выплат</h1>
+      <p class="subtitle">Настройте состав и введите суммы.</p>
+
+      <!-- Месяц и год -->
+      <div class="card">
+        <label>Месяц и год расчёта</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="custom-select-trigger small" id="month-trigger" style="flex:1; min-width:120px;">
+            <span>Январь</span>
+            <span class="arrow">▼</span>
+          </div>
+          <input type="text" id="calc-year" placeholder="2024" style="width:auto; flex:1; min-width:90px;" aria-label="Год">
+        </div>
+        <p style="font-size:clamp(12px, 1.2vw, 16px); color:var(--text-secondary); margin-top:6px;">Автоматически подставлен текущий месяц и год.</p>
+      </div>
+
+      <!-- НАСТРОЙКИ ВЫПЛАТ -->
+      <div class="card" id="settings-card">
+        <label style="margin-bottom:8px; font-weight:600; font-size:clamp(16px, 2vw, 24px);">Настройки выплат</label>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label>Кол-во выплат:</label>
+            <div class="custom-select-trigger small" id="payments-trigger">
+              <span>2</span>
+              <span class="arrow">▼</span>
+            </div>
+          </div>
+          <div class="setting-item">
+            <label for="vacation-toggle" style="cursor:pointer;">Отпускные</label>
+            <div id="vacation-toggle" class="toggle-switch active" onclick="toggleVacation()"></div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; border-top:1px solid var(--glass-border); padding-top:12px;">
+          <label style="font-size:clamp(14px, 1.8vw, 22px); color:var(--text-secondary); margin-bottom:6px;">Категория дохода</label>
+          <div class="custom-select-trigger" id="category-trigger">
+            <span>Основная</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div id="custom-category-wrapper" style="margin-top:8px; display:none;">
+            <input type="text" id="custom-category" placeholder="Введите свою категорию" style="width:100%; padding:12px; background:var(--input-bg); border:1px solid rgba(255,255,255,0.08); border-radius:var(--radius-sm); color:white; font-size:clamp(16px,2vw,24px);">
+          </div>
+        </div>
+      </div>
+
+      <!-- Блок с полями ввода -->
+      <div class="bottom-group">
+        <div class="card" id="payments-fields">
+          <!-- Сюда динамически вставляются поля -->
+        </div>
+        <div class="button-row">
+          <button class="btn-clear" onclick="clearAll()">🗑️ Очистить</button>
+          <button class="btn-calc" id="calc-btn" onclick="handleCalculate()">Рассчитать</button>
+        </div>
+      </div>
+
+      <!-- ===== РАСПОРКА ВНИЗУ ===== -->
+      <div class="bottom-spacer"></div>
+    </section>
+
+    <!-- ===== ВКЛАДКА: РАСЧЁТ ===== -->
+    <section id="tab-calc" role="tabpanel" aria-labelledby="nav-calc">
+      <h1>Результаты</h1>
+      <p class="subtitle" id="calc-period-display">Период не выбран</p>
+      <div id="calc-results">
+        <div class="result-grid">
+          <div class="stat-box"><div class="stat-label">Зарплата (выплаты)</div><div class="stat-value" id="res-salary">0 ₽</div></div>
+          <div class="stat-box"><div class="stat-label">Отпускные</div><div class="stat-value" style="color:var(--accent-purple)" id="res-vacation">0 ₽</div></div>
+          <div class="stat-box" style="grid-column:1/-1;"><div class="stat-label">Итого (зарплата + отпускные)</div><div class="stat-value" id="res-total">0 ₽</div></div>
+        </div>
+        <div id="vacation-bubble-container" style="text-align:center; margin-top:6px;"></div>
+        <div class="card" style="margin-top:12px;">
+          <p style="color:var(--text-secondary); font-size:clamp(14px, 1.6vw, 22px);">Детали:</p>
+          <p id="res-details" style="font-size:clamp(16px, 1.8vw, 24px); line-height:1.5;"></p>
+          <p id="res-category" style="font-size:clamp(16px, 1.8vw, 24px); color:var(--accent-purple); margin-top:4px;"></p>
+          <p id="res-note" style="font-size:clamp(16px, 1.8vw, 24px); color:var(--text-secondary); margin-top:4px; font-style:italic;"></p>
+        </div>
+        <div class="card">
+          <label for="note-calc">Примечание</label>
+          <textarea id="note-calc" placeholder="Дополнительный комментарий..."></textarea>
+        </div>
+      </div>
+      <div id="calc-placeholder" class="empty" style="display:none;"><p>🔍 Выполните расчёт на вкладке «Ввод»</p></div>
+
+      <div class="bottom-spacer"></div>
+    </section>
+
+    <!-- ===== ВКЛАДКА: ИСТОРИЯ ===== -->
+    <section id="tab-history" role="tabpanel" aria-labelledby="nav-history">
+      <h1>История записей</h1>
+      <p class="subtitle">Сохранённые расчёты.</p>
+      <div class="history-actions">
+        <button onclick="exportHistory()">📤 Экспорт</button>
+        <button onclick="document.getElementById('import-file').click()">📥 Импорт</button>
+        <input type="file" id="import-file" class="hidden-input" accept=".json" onchange="importHistory(event)">
+        <button onclick="clearHistory()">🗑️ Очистить</button>
+      </div>
+      <div id="history-list"></div>
+
+      <div class="bottom-spacer"></div>
+    </section>
+
+    <!-- ===== ВКЛАДКА: СТАТИСТИКА ===== -->
+    <section id="tab-stats" role="tabpanel" aria-labelledby="nav-stats">
+      <h1>Статистика</h1>
+      <p class="subtitle">Динамика и средние значения.</p>
+      <div class="stats-controls">
+        <div class="custom-select-trigger small" id="stats-trigger">
+          <span>За 6 месяцев</span>
+          <span class="arrow">▼</span>
+        </div>
+      </div>
+      <div class="card" style="padding:6px;">
+        <canvas id="salaryChart"></canvas>
+      </div>
+      <div class="stats-grid" id="stats-summary">
+        <div class="stat-box"><div class="stat-label">Средняя зарплата</div><div class="stat-value" id="stat-avg">-</div></div>
+        <div class="stat-box"><div class="stat-label">Медиана</div><div class="stat-value" id="stat-median">-</div></div>
+        <div class="stat-box"><div class="stat-label">Минимум</div><div class="stat-value" id="stat-min">-</div></div>
+        <div class="stat-box"><div class="stat-label">Максимум</div><div class="stat-value" id="stat-max">-</div></div>
+      </div>
+
+      <div class="bottom-spacer"></div>
+    </section>
+
+    <!-- ===== ВКЛАДКА: НАСТРОЙКИ ===== -->
+    <section id="tab-settings" role="tabpanel" aria-labelledby="nav-settings">
+      <h1>Настройки</h1>
+      <p class="subtitle">Управляйте параметрами приложения.</p>
+      <div class="card">
+        <div class="settings-list">
+          <!-- Интерфейс -->
+          <div class="setting-item">
+            <div>
+              <label for="theme-toggle">🌗 Тёмная тема</label>
+            </div>
+            <div id="theme-toggle" class="toggle-switch active" onclick="toggleTheme()"></div>
+          </div>
+          <div class="setting-item">
+            <div>
+              <label for="hints-toggle">💡 Показывать подсказки</label>
+              <div class="setting-description">Всплывающие подсказки при вводе</div>
+            </div>
+            <div id="hints-toggle" class="toggle-switch active" onclick="toggleHints()"></div>
+          </div>
+
+          <!-- Напоминания -->
+          <div class="setting-item">
+            <div>
+              <label for="notifications-toggle">🔔 Уведомления</label>
+              <div class="setting-description">Напоминание в день выплаты</div>
+            </div>
+            <div id="notifications-toggle" class="toggle-switch active" onclick="toggleNotifications()"></div>
+          </div>
+          <div class="setting-item" style="flex-wrap: wrap; gap: 12px;">
+            <div style="flex:1; min-width:140px;">
+              <label for="reminder-day">📅 День напоминания</label>
+              <div class="setting-description">1–31</div>
+            </div>
+            <input type="text" id="reminder-day" placeholder="15" style="width:100px; text-align:center;">
+          </div>
+          <div class="setting-item">
+            <div>
+              <label>⏳ Напоминать за</label>
+              <div class="setting-description">Количество дней до даты</div>
+            </div>
+            <div class="custom-select-trigger small" id="reminder-trigger" style="width:auto; flex:0 0 160px;">
+              <span>3 дня</span>
+              <span class="arrow">▼</span>
+            </div>
+          </div>
+
+          <!-- Расчёты -->
+          <div class="setting-item">
+            <div>
+              <label for="auto-calc-toggle">⚡ Авторасчёт</label>
+              <div class="setting-description">Автоматически пересчитывать при изменении полей</div>
+            </div>
+            <div id="auto-calc-toggle" class="toggle-switch" onclick="toggleAutoCalc()"></div>
+          </div>
+          <div class="setting-item">
+            <div>
+              <label>💰 Валюта</label>
+            </div>
+            <div class="custom-select-trigger small" id="currency-trigger" style="width:auto; flex:0 0 140px;">
+              <span>₽ (Рубль)</span>
+              <span class="arrow">▼</span>
+            </div>
+          </div>
+
+          <!-- Статистика -->
+          <div class="setting-item">
+            <div>
+              <label>📊 Статистика по умолчанию</label>
+            </div>
+            <div class="custom-select-trigger small" id="default-stats-trigger" style="width:auto; flex:0 0 160px;">
+              <span>За 6 месяцев</span>
+              <span class="arrow">▼</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-spacer"></div>
+    </section>
+  </div>
+</main>
+
+<!-- ===== ТОСТ ===== -->
+<div id="toast" class="toast"></div>
+
+<!-- ===== НИЖНЕЕ МЕНЮ ===== -->
+<div class="nav-container-wrapper">
+  <nav class="nav-container-oval" role="tablist">
+    <button class="nav-item active" id="nav-input" role="tab" aria-controls="tab-input" aria-selected="true" onclick="switchTab('tab-input', this)"><span class="nav-icon">📝</span><span>Ввод</span></button>
+    <button class="nav-item" id="nav-calc" role="tab" aria-controls="tab-calc" aria-selected="false" onclick="switchTab('tab-calc', this)"><span class="nav-icon">📊</span><span>Расчёт</span></button>
+    <button class="nav-item" id="nav-history" role="tab" aria-controls="tab-history" aria-selected="false" onclick="switchTab('tab-history', this)"><span class="nav-icon">🗂️</span><span>История</span></button>
+    <button class="nav-item" id="nav-stats" role="tab" aria-controls="tab-stats" aria-selected="false" onclick="switchTab('tab-stats', this)"><span class="nav-icon">📈</span><span>Статистика</span></button>
+    <button class="nav-item" id="nav-settings" role="tab" aria-controls="tab-settings" aria-selected="false" onclick="switchTab('tab-settings', this)"><span class="nav-icon">⚙️</span><span>Настройки</span></button>
+  </nav>
+</div>
+
+<script>
+  (function() {
+    'use strict';
+
+    const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                       'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    let editingIndex = null;
+    let activeTrigger = null;
+
+    // ---- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ----
+    function cleanNumberInput(value) { return value.replace(/[^0-9.,]/g, ''); }
+    function parseNumberFromInput(value) {
+      if (!value) return 0;
+      const cleaned = value.replace(/\s/g, '').replace(',', '.');
+      const num = parseFloat(cleaned);
+      if (isNaN(num) || num < 0) return 0;
+      return num;
+    }
+    function formatMoney(amount, currency = '₽') {
+      if (typeof amount !== 'number' || isNaN(amount)) amount = 0;
+      const fixed = amount.toFixed(2);
+      const parts = fixed.split('.');
+      const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      return intPart + '.' + parts[1] + ' ' + currency;
+    }
+    function getInputValue(id) {
+      const el = document.getElementById(id);
+      if (!el) return 0;
+      return parseNumberFromInput(el.value);
+    }
+
+    // ---- ТОСТ ----
+    function showToast(message, duration = 2500) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toast._hideTimeout);
+      toast._hideTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, duration);
+    }
+
+    // ---- АНИМАЦИЯ ЧИСЕЛ ----
+    function animateNumber(element, targetValue, currency, duration = 1200) {
+      const chars = '0123456789.,- ';
+      const targetStr = targetValue.toFixed(2);
+      const targetParts = targetStr.split('.');
+      const intPart = targetParts[0];
+      const decPart = targetParts[1] || '00';
+      const fullTarget = intPart + '.' + decPart;
+      const length = fullTarget.length;
+
+      let currentText = '';
+      for (let i = 0; i < length; i++) {
+        currentText += chars[Math.floor(Math.random() * chars.length)];
+      }
+      element.textContent = currentText + ' ' + currency;
+
+      const startTime = performance.now();
+
+      function update() {
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const revealCount = Math.floor(progress * length);
+        let newText = '';
+        for (let i = 0; i < length; i++) {
+          if (i < revealCount) {
+            newText += fullTarget[i];
+          } else {
+            newText += chars[Math.floor(Math.random() * chars.length)];
+          }
+        }
+        element.textContent = newText + ' ' + currency;
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        } else {
+          element.textContent = formatMoney(targetValue, currency);
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    // ---- ДРОПДАУН (ПОРТАЛ) ----
+    function openDropdown(trigger, options, onSelect) {
+      if (activeTrigger === trigger) {
+        closeDropdown();
+        return;
+      }
+      closeDropdown();
+
+      const rect = trigger.getBoundingClientRect();
+      const portal = document.createElement('div');
+      portal.className = 'dropdown-portal';
+      portal.style.top = (rect.bottom + 6) + 'px';
+      portal.style.left = rect.left + 'px';
+      portal.style.width = Math.max(rect.width, 100) + 'px';
+      portal.style.minWidth = '100px';
+
+      options.forEach(opt => {
+        const div = document.createElement('div');
+        div.className = 'option';
+        if (opt.selected) div.classList.add('selected');
+        div.textContent = opt.label;
+        div.dataset.value = opt.value;
+        div.addEventListener('click', function(e) {
+          e.stopPropagation();
+          onSelect(opt.value, opt.label);
+          closeDropdown();
+        });
+        portal.appendChild(div);
+      });
+
+      document.body.appendChild(portal);
+      activeTrigger = trigger;
+      trigger.querySelector('.arrow').classList.add('open');
+
+      requestAnimationFrame(() => {
+        portal.classList.add('open');
+      });
+
+      const closeHandler = function(e) {
+        if (!portal.contains(e.target) && !trigger.contains(e.target)) {
+          closeDropdown();
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeHandler);
+      }, 10);
+    }
+
+    function closeDropdown() {
+      if (activeTrigger) {
+        const portal = document.querySelector('.dropdown-portal.open');
+        if (portal) {
+          portal.classList.remove('open');
+          setTimeout(() => {
+            if (portal.parentNode) portal.parentNode.removeChild(portal);
+          }, 200);
+        }
+        activeTrigger.querySelector('.arrow').classList.remove('open');
+        activeTrigger = null;
+      } else {
+        const portal = document.querySelector('.dropdown-portal');
+        if (portal) {
+          portal.classList.remove('open');
+          setTimeout(() => {
+            if (portal.parentNode) portal.parentNode.removeChild(portal);
+          }, 200);
+        }
+      }
+    }
+
+    // ---- ИНИЦИАЛИЗАЦИЯ ТРИГГЕРОВ ----
+    function initTriggers() {
+      const triggers = document.querySelectorAll('.custom-select-trigger');
+      triggers.forEach(trigger => {
+        trigger.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const id = this.id;
+          let options = [];
+          let onSelect = null;
+
+          if (id === 'month-trigger') {
+            options = MONTHS_RU.map((m, i) => ({
+              value: String(i+1).padStart(2, '0'),
+              label: m,
+              selected: document.querySelector('#month-trigger span:first-child').textContent === m
+            }));
+            onSelect = (val, label) => {
+              document.querySelector('#month-trigger span:first-child').textContent = label;
+              document.getElementById('calc-month-hidden').value = val;
+              saveSettings();
+              if (document.getElementById('auto-calc-toggle').classList.contains('active')) {
+                handleCalculate();
+              }
+            };
+          } else if (id === 'payments-trigger') {
+            const count = [1,2,3,4,5,6,7,8,9,10];
+            options = count.map(c => ({
+              value: String(c),
+              label: String(c),
+              selected: document.querySelector('#payments-trigger span:first-child').textContent === String(c)
+            }));
+            onSelect = (val) => {
+              document.querySelector('#payments-trigger span:first-child').textContent = val;
+              document.getElementById('payments-count').value = val;
+              generateFields();
+              saveSettings();
+              if (document.getElementById('auto-calc-toggle').classList.contains('active')) {
+                handleCalculate();
+              }
+            };
+          } else if (id === 'category-trigger') {
+            const cats = ['Основная','Подработка','Премия','Другое'];
+            options = cats.map(c => ({
+              value: c,
+              label: c,
+              selected: document.querySelector('#category-trigger span:first-child').textContent === c
+            }));
+            onSelect = (val) => {
+              document.querySelector('#category-trigger span:first-child').textContent = val;
+              document.getElementById('category-select-hidden').value = val;
+              toggleCustomCategoryVisibility();
+              saveSettings();
+            };
+          } else if (id === 'stats-trigger') {
+            const periods = [
+              {value:'3', label:'За 3 месяца'},
+              {value:'6', label:'За 6 месяцев'},
+              {value:'12', label:'За 12 месяцев'},
+              {value:'all', label:'За всё время'}
+            ];
+            options = periods.map(p => ({
+              value: p.value,
+              label: p.label,
+              selected: document.querySelector('#stats-trigger span:first-child').textContent === p.label
+            }));
+            onSelect = (val, label) => {
+              document.querySelector('#stats-trigger span:first-child').textContent = label;
+              document.getElementById('stats-period').value = val;
+              updateStats();
+              saveSettings();
+            };
+          } else if (id === 'reminder-trigger') {
+            const days = [0,1,2,3,4,5,6,7];
+            const labels = ['0 (только в день)','1 день','2 дня','3 дня','4 дня','5 дней','6 дней','7 дней'];
+            options = days.map((d, i) => ({
+              value: String(d),
+              label: labels[i],
+              selected: document.querySelector('#reminder-trigger span:first-child').textContent === labels[i]
+            }));
+            onSelect = (val, label) => {
+              document.querySelector('#reminder-trigger span:first-child').textContent = label;
+              document.getElementById('reminder-days-before').value = val;
+              saveSettings();
+            };
+          } else if (id === 'currency-trigger') {
+            const currencies = [
+              {value:'₽', label:'₽ (Рубль)'},
+              {value:'$', label:'$ (Доллар)'},
+              {value:'€', label:'€ (Евро)'}
+            ];
+            options = currencies.map(c => ({
+              value: c.value,
+              label: c.label,
+              selected: document.querySelector('#currency-trigger span:first-child').textContent === c.label
+            }));
+            onSelect = (val, label) => {
+              document.querySelector('#currency-trigger span:first-child').textContent = label;
+              document.getElementById('currency-select-hidden').value = val;
+              saveSettings();
+              renderHistory();
+              updateStats(false);
+              if (document.getElementById('calc-results').style.display !== 'none') {
+                handleCalculate();
+              }
+            };
+          } else if (id === 'default-stats-trigger') {
+            const periods = [
+              {value:'3', label:'За 3 месяца'},
+              {value:'6', label:'За 6 месяцев'},
+              {value:'12', label:'За 12 месяцев'},
+              {value:'all', label:'За всё время'}
+            ];
+            options = periods.map(p => ({
+              value: p.value,
+              label: p.label,
+              selected: document.querySelector('#default-stats-trigger span:first-child').textContent === p.label
+            }));
+            onSelect = (val, label) => {
+              document.querySelector('#default-stats-trigger span:first-child').textContent = label;
+              document.getElementById('default-stats-period').value = val;
+              saveSettings();
+            };
+          }
+
+          if (options.length && onSelect) {
+            openDropdown(this, options, onSelect);
+          }
+        });
+      });
+    }
+
+    // ---- СОХРАНЕНИЕ НАСТРОЕК (автоматическое) ----
+    function saveSettings() {
+      const paymentsCount = document.getElementById('payments-count').value || '2';
+      const category = document.getElementById('category-select-hidden').value || 'Основная';
+      const customCategory = document.getElementById('custom-category').value;
+      const month = document.getElementById('calc-month-hidden').value || '01';
+      const reminderDays = document.getElementById('reminder-days-before').value || '3';
+      const currency = document.getElementById('currency-select-hidden').value || '₽';
+      const defaultStats = document.getElementById('default-stats-period').value || '6';
+
+      const settings = {
+        paymentsCount,
+        hasVacation: document.getElementById('vacation-toggle').classList.contains('active'),
+        category,
+        customCategory,
+        month,
+        year: document.getElementById('calc-year').value,
+        theme: document.body.classList.contains('light-theme') ? 'light' : 'dark',
+        notifications: document.getElementById('notifications-toggle').classList.contains('active'),
+        reminderDay: document.getElementById('reminder-day').value,
+        reminderDaysBefore: reminderDays,
+        autoCalc: document.getElementById('auto-calc-toggle').classList.contains('active'),
+        hints: document.getElementById('hints-toggle').classList.contains('active'),
+        currency,
+        defaultStatsPeriod: defaultStats
+      };
+      localStorage.setItem('salary-settings', JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+      const saved = localStorage.getItem('salary-settings');
+      if (saved) {
+        try {
+          const settings = JSON.parse(saved);
+          const monthIdx = parseInt(settings.month,10) - 1;
+          if (monthIdx >=0 && monthIdx < 12) {
+            document.querySelector('#month-trigger span:first-child').textContent = MONTHS_RU[monthIdx];
+          }
+          document.getElementById('calc-month-hidden').value = settings.month || '01';
+          document.getElementById('calc-year').value = settings.year || '';
+
+          // Если год не установлен (пусто) – подставить текущий
+          if (!document.getElementById('calc-year').value) {
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            document.querySelector('#month-trigger span:first-child').textContent = MONTHS_RU[now.getMonth()];
+            document.getElementById('calc-month-hidden').value = month;
+            document.getElementById('calc-year').value = now.getFullYear();
+          }
+
+          document.querySelector('#payments-trigger span:first-child').textContent = settings.paymentsCount || '2';
+          document.getElementById('payments-count').value = settings.paymentsCount || '2';
+
+          const vacationToggle = document.getElementById('vacation-toggle');
+          if (settings.hasVacation !== undefined) {
+            if (settings.hasVacation) vacationToggle.classList.add('active');
+            else vacationToggle.classList.remove('active');
+          } else {
+            vacationToggle.classList.add('active');
+          }
+
+          document.querySelector('#category-trigger span:first-child').textContent = settings.category || 'Основная';
+          document.getElementById('category-select-hidden').value = settings.category || 'Основная';
+          document.getElementById('custom-category').value = settings.customCategory || '';
+          toggleCustomCategoryVisibility();
+
+          if (settings.theme === 'light') {
+            document.body.classList.add('light-theme');
+            document.getElementById('theme-toggle').classList.remove('active');
+          } else {
+            document.body.classList.remove('light-theme');
+            document.getElementById('theme-toggle').classList.add('active');
+          }
+
+          const notifToggle = document.getElementById('notifications-toggle');
+          if (settings.notifications !== undefined) {
+            if (settings.notifications) notifToggle.classList.add('active');
+            else notifToggle.classList.remove('active');
+          } else {
+            notifToggle.classList.add('active');
+          }
+
+          document.getElementById('reminder-day').value = settings.reminderDay || '';
+
+          const remDays = settings.reminderDaysBefore || '3';
+          const remLabels = ['0 (только в день)','1 день','2 дня','3 дня','4 дня','5 дней','6 дней','7 дней'];
+          document.querySelector('#reminder-trigger span:first-child').textContent = remLabels[parseInt(remDays,10)] || '3 дня';
+          document.getElementById('reminder-days-before').value = remDays;
+
+          const autoToggle = document.getElementById('auto-calc-toggle');
+          if (settings.autoCalc !== undefined) {
+            if (settings.autoCalc) autoToggle.classList.add('active');
+            else autoToggle.classList.remove('active');
+          } else {
+            autoToggle.classList.remove('active');
+          }
+
+          const hintsToggle = document.getElementById('hints-toggle');
+          if (settings.hints !== undefined) {
+            if (settings.hints) hintsToggle.classList.add('active');
+            else hintsToggle.classList.remove('active');
+          } else {
+            hintsToggle.classList.add('active');
+          }
+
+          const currencyLabels = {'₽':'₽ (Рубль)','$':'$ (Доллар)','€':'€ (Евро)'};
+          document.querySelector('#currency-trigger span:first-child').textContent = currencyLabels[settings.currency] || '₽ (Рубль)';
+          document.getElementById('currency-select-hidden').value = settings.currency || '₽';
+
+          const statsLabels = {'3':'За 3 месяца','6':'За 6 месяцев','12':'За 12 месяцев','all':'За всё время'};
+          document.querySelector('#default-stats-trigger span:first-child').textContent = statsLabels[settings.defaultStatsPeriod] || 'За 6 месяцев';
+          document.getElementById('default-stats-period').value = settings.defaultStatsPeriod || '6';
+
+          if (autoToggle.classList.contains('active')) {
+            enableAutoCalc();
+          } else {
+            disableAutoCalc();
+          }
+
+        } catch(e) {}
+      } else {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        document.querySelector('#month-trigger span:first-child').textContent = MONTHS_RU[now.getMonth()];
+        document.getElementById('calc-month-hidden').value = month;
+        document.getElementById('calc-year').value = now.getFullYear();
+
+        document.querySelector('#payments-trigger span:first-child').textContent = '2';
+        document.getElementById('payments-count').value = '2';
+        document.getElementById('vacation-toggle').classList.add('active');
+        document.querySelector('#category-trigger span:first-child').textContent = 'Основная';
+        document.getElementById('category-select-hidden').value = 'Основная';
+        document.getElementById('custom-category').value = '';
+        document.getElementById('theme-toggle').classList.add('active');
+        document.getElementById('notifications-toggle').classList.add('active');
+        document.getElementById('hints-toggle').classList.add('active');
+        document.querySelector('#reminder-trigger span:first-child').textContent = '3 дня';
+        document.getElementById('reminder-days-before').value = '3';
+        document.getElementById('auto-calc-toggle').classList.remove('active');
+        document.querySelector('#currency-trigger span:first-child').textContent = '₽ (Рубль)';
+        document.getElementById('currency-select-hidden').value = '₽';
+        document.querySelector('#default-stats-trigger span:first-child').textContent = 'За 6 месяцев';
+        document.getElementById('default-stats-period').value = '6';
+        saveSettings();
+      }
+    }
+
+    // ---- ПОКАЗ/СКРЫТИЕ ПОЛЯ "СВОЯ КАТЕГОРИЯ" ----
+    function toggleCustomCategoryVisibility() {
+      const category = document.getElementById('category-select-hidden').value;
+      const wrapper = document.getElementById('custom-category-wrapper');
+      const customInput = document.getElementById('custom-category');
+      if (category === 'Другое' || customInput.value.trim() !== '') {
+        wrapper.style.display = 'block';
+        if (category === 'Другое') customInput.focus();
+      } else {
+        wrapper.style.display = 'none';
+        customInput.value = '';
+      }
+    }
+
+    // ---- ПЕРЕКЛЮЧЕНИЕ ТУМБЛЕРОВ ----
+    window.toggleVacation = function() {
+      const toggle = document.getElementById('vacation-toggle');
+      toggle.classList.toggle('active');
+      saveSettings();
+      generateFields();
+    };
+
+    window.toggleTheme = function() {
+      const toggle = document.getElementById('theme-toggle');
+      const isDark = toggle.classList.contains('active');
+      if (isDark) {
+        document.body.classList.add('light-theme');
+        toggle.classList.remove('active');
+      } else {
+        document.body.classList.remove('light-theme');
+        toggle.classList.add('active');
+      }
+      saveSettings();
+    };
+
+    window.toggleNotifications = function() {
+      const toggle = document.getElementById('notifications-toggle');
+      toggle.classList.toggle('active');
+      if (toggle.classList.contains('active')) {
+        if ('Notification' in window) {
+          if (Notification.permission === 'default') {
+            Notification.requestPermission().then(perm => {
+              if (perm !== 'granted') {
+                toggle.classList.remove('active');
+                showToast('Разрешите уведомления в браузере', 3000);
+              }
+            });
+          } else if (Notification.permission === 'denied') {
+            toggle.classList.remove('active');
+            showToast('Уведомления запрещены в браузере', 3000);
+          }
+        } else {
+          toggle.classList.remove('active');
+          showToast('Уведомления не поддерживаются', 3000);
+        }
+      }
+      saveSettings();
+    };
+
+    window.toggleAutoCalc = function() {
+      const toggle = document.getElementById('auto-calc-toggle');
+      toggle.classList.toggle('active');
+      if (toggle.classList.contains('active')) {
+        enableAutoCalc();
+      } else {
+        disableAutoCalc();
+      }
+      saveSettings();
+    };
+
+    window.toggleHints = function() {
+      const toggle = document.getElementById('hints-toggle');
+      toggle.classList.toggle('active');
+      saveSettings();
+    };
+
+    // ---- АВТОРАСЧЁТ ----
+    function enableAutoCalc() {
+      const inputs = document.querySelectorAll('#tab-input input[type="text"]');
+      inputs.forEach(input => {
+        input.addEventListener('input', autoCalcHandler);
+      });
+    }
+
+    function disableAutoCalc() {
+      const inputs = document.querySelectorAll('#tab-input input[type="text"]');
+      inputs.forEach(input => {
+        input.removeEventListener('input', autoCalcHandler);
+      });
+    }
+
+    function autoCalcHandler() {
+      clearTimeout(window.autoCalcTimeout);
+      window.autoCalcTimeout = setTimeout(() => {
+        handleCalculate();
+      }, 300);
+    }
+
+    // ---- ГЕНЕРАЦИЯ ПОЛЕЙ ВВОДА ----
+    function generateFields() {
+      const container = document.getElementById('payments-fields');
+      const count = parseInt(document.getElementById('payments-count').value || '2', 10);
+      const hasVacation = document.getElementById('vacation-toggle').classList.contains('active');
+
+      let html = '';
+
+      html += `
+        <div style="margin-bottom:12px;" id="advance-field">
+          <label for="prev-advance">Аванс (прошлый месяц), ₽</label>
+          <input type="text" id="prev-advance" placeholder="0" aria-label="Аванс прошлого месяца">
+        </div>
+      `;
+
+      for (let i = 1; i <= count; i++) {
+        const label = i === 1 ? 'Первая выплата' :
+                      i === 2 ? 'Вторая выплата' :
+                      i === 3 ? 'Третья выплата' :
+                      `${i}-я выплата`;
+        html += `
+          <div style="margin-bottom:12px;" class="payment-field" data-index="${i}">
+            <label for="payment-${i}">${label} (текущий месяц), ₽</label>
+            <input type="text" id="payment-${i}" placeholder="0" aria-label="${label}">
+          </div>
+        `;
+      }
+
+      if (hasVacation) {
+        html += `
+          <div style="margin-bottom:0;" id="vacation-field">
+            <label for="vacation">Отпускные, ₽</label>
+            <input type="text" id="vacation" placeholder="0" aria-label="Отпускные">
+          </div>
+        `;
+      } else {
+        html += `<div id="vacation-field" class="hidden-field"></div>`;
+      }
+
+      container.innerHTML = html;
+
+      container.querySelectorAll('input[type="text"]').forEach(input => {
+        input.addEventListener('input', function() {
+          this.value = cleanNumberInput(this.value);
+        });
+        input.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); handleCalculate(); }
+        });
+        if (document.getElementById('auto-calc-toggle').classList.contains('active')) {
+          input.addEventListener('input', autoCalcHandler);
+        }
+      });
+    }
+
+    // ---- ИНИЦИАЛИЗАЦИЯ ----
+    function init() {
+      const hiddenInputs = `
+        <input type="hidden" id="calc-month-hidden" value="01">
+        <input type="hidden" id="payments-count" value="2">
+        <input type="hidden" id="category-select-hidden" value="Основная">
+        <input type="hidden" id="stats-period" value="6">
+        <input type="hidden" id="reminder-days-before" value="3">
+        <input type="hidden" id="currency-select-hidden" value="₽">
+        <input type="hidden" id="default-stats-period" value="6">
+      `;
+      document.body.insertAdjacentHTML('beforeend', hiddenInputs);
+
+      loadSettings();
+      generateFields();
+      initTriggers();
+
+      document.getElementById('custom-category').addEventListener('input', function() {
+        if (this.value.trim() !== '') {
+          document.getElementById('category-select-hidden').value = 'Другое';
+          document.querySelector('#category-trigger span:first-child').textContent = 'Другое';
+          toggleCustomCategoryVisibility();
+        } else {
+          toggleCustomCategoryVisibility();
+        }
+        saveSettings();
+      });
+
+      document.getElementById('calc-year').addEventListener('change', saveSettings);
+      document.getElementById('reminder-day').addEventListener('change', saveSettings);
+
+      renderHistory();
+      clearAll();
+      const defaultStats = document.getElementById('default-stats-period').value || '6';
+      document.getElementById('stats-period').value = defaultStats;
+      const statsLabels = {'3':'За 3 месяца','6':'За 6 месяцев','12':'За 12 месяцев','all':'За всё время'};
+      document.querySelector('#stats-trigger span:first-child').textContent = statsLabels[defaultStats] || 'За 6 месяцев';
+      updateStats(false);
+      checkReminder();
+
+      if (document.getElementById('auto-calc-toggle').classList.contains('active')) {
+        enableAutoCalc();
+      }
+
+      window.addEventListener('resize', function() {
+        if (document.getElementById('tab-stats').classList.contains('active')) {
+          updateStats(false);
+        }
+      });
+    }
+
+    // ---- ОСТАЛЬНЫЕ ФУНКЦИИ (история, расчёт, статистика) ----
+    function getHistory() {
+      try { return JSON.parse(localStorage.getItem('salary-history-v5')) || []; }
+      catch { return []; }
+    }
+    function setHistory(history) { localStorage.setItem('salary-history-v5', JSON.stringify(history)); }
+
+    window.clearAll = function() {
+      document.querySelectorAll('#tab-input input[type="text"]').forEach(el => el.value = '');
+      document.getElementById('note-calc').value = '';
+      editingIndex = null;
+      document.getElementById('calc-btn').textContent = 'Рассчитать';
+      document.getElementById('form-title').textContent = 'Ввод выплат';
+      document.getElementById('res-salary').textContent = '0 ₽';
+      document.getElementById('res-vacation').textContent = '0 ₽';
+      document.getElementById('res-total').textContent = '0 ₽';
+      document.getElementById('vacation-bubble-container').innerHTML = '';
+      document.getElementById('res-details').textContent = '';
+      document.getElementById('res-category').textContent = '';
+      document.getElementById('res-note').textContent = '';
+      document.getElementById('calc-period-display').textContent = 'Период не выбран';
+      document.getElementById('calc-results').style.display = 'none';
+      document.getElementById('calc-placeholder').style.display = 'block';
+
+      // Убедиться, что год и месяц установлены
+      if (!document.getElementById('calc-year').value) {
+        const now = new Date();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        document.querySelector('#month-trigger span:first-child').textContent = MONTHS_RU[now.getMonth()];
+        document.getElementById('calc-month-hidden').value = month;
+        document.getElementById('calc-year').value = now.getFullYear();
+      }
+    };
+
+    function gatherInputs() {
+      const month = document.getElementById('calc-month-hidden').value || '01';
+      const year = parseNumberFromInput(document.getElementById('calc-year').value);
+      const hasVacation = document.getElementById('vacation-toggle').classList.contains('active');
+      const count = parseInt(document.getElementById('payments-count').value || '2', 10);
+
+      let payments = [];
+      for (let i = 1; i <= count; i++) {
+        const el = document.getElementById(`payment-${i}`);
+        if (el) payments.push(parseNumberFromInput(el.value));
+      }
+
+      const advance = getInputValue('prev-advance');
+      let vacation = 0;
+      if (hasVacation) vacation = getInputValue('vacation');
+
+      let category = document.getElementById('category-select-hidden').value || 'Основная';
+      const custom = document.getElementById('custom-category').value.trim();
+      if (custom) category = custom;
+
+      const note = document.getElementById('note-calc').value.trim();
+
+      return { month, year, payments, advance, vacation, category, note, hasVacation, paymentsCount: count };
+    }
+
+    window.handleCalculate = function() {
+      const data = gatherInputs();
+      if (!data.year || data.year < 2000 || data.year > 2100) {
+        showToast('Укажите корректный год (2000–2100)', 3000);
+        return;
+      }
+
+      const salaryTotal = data.payments.reduce((a, b) => a + b, 0) + data.advance;
+      const total = salaryTotal + data.vacation;
+
+      if (editingIndex !== null) {
+        const history = getHistory();
+        if (editingIndex >= 0 && editingIndex < history.length) {
+          const entry = history[editingIndex];
+          entry.month = data.month;
+          entry.year = data.year;
+          entry.payments = data.payments;
+          entry.advance = data.advance;
+          entry.vacation = data.vacation;
+          entry.salaryTotal = salaryTotal;
+          entry.total = total;
+          entry.category = data.category;
+          entry.note = data.note;
+          entry.hasVacation = data.hasVacation;
+          entry.paymentsCount = data.paymentsCount;
+          const now = new Date();
+          entry.date = now.toLocaleDateString('ru-RU');
+          entry.time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+          setHistory(history);
+          editingIndex = null;
+          document.getElementById('calc-btn').textContent = 'Рассчитать';
+          document.getElementById('form-title').textContent = 'Ввод выплат';
+        }
+      } else {
+        const history = getHistory();
+        const now = new Date();
+        history.unshift({
+          date: now.toLocaleDateString('ru-RU'),
+          time: now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+          month: data.month,
+          year: data.year,
+          payments: data.payments,
+          advance: data.advance,
+          vacation: data.vacation,
+          salaryTotal: salaryTotal,
+          total: total,
+          category: data.category,
+          note: data.note,
+          hasVacation: data.hasVacation,
+          paymentsCount: data.paymentsCount
+        });
+        setHistory(history);
+      }
+
+      const currency = document.getElementById('currency-select-hidden').value || '₽';
+      displayResults(data.month, data.year, data.payments, data.advance, data.vacation, salaryTotal, total, data.category, data.note, currency);
+      renderHistory();
+      updateStats();
+      const navCalc = document.getElementById('nav-calc');
+      switchTab('tab-calc', navCalc);
+    };
+
+    function displayResults(month, year, payments, advance, vacation, salaryTotal, total, category, note, currency) {
+      document.getElementById('res-salary').textContent = formatMoney(salaryTotal, currency);
+      document.getElementById('res-vacation').textContent = formatMoney(vacation, currency);
+      document.getElementById('res-total').textContent = formatMoney(total, currency);
+
+      const monthName = MONTHS_RU[parseInt(month, 10) - 1] || 'Неизвестный месяц';
+      document.getElementById('calc-period-display').textContent = `${monthName} ${year}`;
+
+      const bubble = document.getElementById('vacation-bubble-container');
+      bubble.innerHTML = vacation > 0
+        ? `<span class="vacation-badge"><span>🌴</span>Отпускные: ${formatMoney(vacation, currency)}</span>`
+        : '';
+
+      let details = '';
+      if (advance > 0) details += `Аванс: ${formatMoney(advance, currency)}\n`;
+      payments.forEach((p, i) => {
+        const label = i === 0 ? 'Первая' : i === 1 ? 'Вторая' : i === 2 ? 'Третья' : `${i+1}-я`;
+        details += `${label} выплата: ${formatMoney(p, currency)}\n`;
+      });
+      if (vacation > 0) details += `Отпускные: ${formatMoney(vacation, currency)}`;
+      document.getElementById('res-details').textContent = details;
+      document.getElementById('res-category').textContent = category ? `🏷️ ${category}` : '';
+      document.getElementById('res-note').textContent = note ? `📝 ${note}` : '';
+
+      document.getElementById('calc-results').style.display = 'block';
+      document.getElementById('calc-placeholder').style.display = 'none';
+    }
+
+    function updateCalcDisplay() {
+      const results = document.getElementById('calc-results');
+      const placeholder = document.getElementById('calc-placeholder');
+      const totalText = document.getElementById('res-total').textContent;
+      if (totalText === '0 ₽' && document.getElementById('res-details').textContent === '') {
+        results.style.display = 'none';
+        placeholder.style.display = 'block';
+      } else {
+        results.style.display = 'block';
+        placeholder.style.display = 'none';
+      }
+    }
+
+    window.deleteHistoryItem = function(index) {
+      const history = getHistory();
+      if (index >= 0 && index < history.length) {
+        history.splice(index, 1);
+        setHistory(history);
+        renderHistory();
+        updateStats();
+      }
+    };
+
+    window.editHistoryItem = function(index) {
+      const history = getHistory();
+      if (index < 0 || index >= history.length) return;
+      const item = history[index];
+      const monthIdx = parseInt(item.month,10) - 1;
+      if (monthIdx >=0 && monthIdx < 12) {
+        document.querySelector('#month-trigger span:first-child').textContent = MONTHS_RU[monthIdx];
+        document.getElementById('calc-month-hidden').value = item.month || '01';
+      }
+      document.getElementById('calc-year').value = String(item.year || '');
+      document.querySelector('#payments-trigger span:first-child').textContent = String(item.paymentsCount || 2);
+      document.getElementById('payments-count').value = String(item.paymentsCount || 2);
+      const toggle = document.getElementById('vacation-toggle');
+      if (item.hasVacation) toggle.classList.add('active');
+      else toggle.classList.remove('active');
+      document.querySelector('#category-trigger span:first-child').textContent = item.category || 'Основная';
+      document.getElementById('category-select-hidden').value = item.category || 'Основная';
+      document.getElementById('custom-category').value = '';
+      toggleCustomCategoryVisibility();
+      generateFields();
+      if (item.advance !== undefined && item.advance > 0) {
+        document.getElementById('prev-advance').value = String(item.advance);
+      }
+      if (item.payments && Array.isArray(item.payments)) {
+        item.payments.forEach((val, idx) => {
+          const el = document.getElementById(`payment-${idx+1}`);
+          if (el) el.value = String(val);
+        });
+      }
+      if (item.vacation !== undefined && item.vacation > 0) {
+        document.getElementById('vacation').value = String(item.vacation);
+      }
+      document.getElementById('note-calc').value = item.note || '';
+
+      editingIndex = index;
+      document.getElementById('calc-btn').textContent = 'Обновить';
+      document.getElementById('form-title').textContent = 'Редактирование записи';
+      const navInput = document.getElementById('nav-input');
+      switchTab('tab-input', navInput);
+      saveSettings();
+    };
+
+    function renderHistory() {
+      const list = document.getElementById('history-list');
+      const history = getHistory();
+      if (history.length === 0) {
+        list.innerHTML = '<div class="empty">История пуста. Сделайте первый расчёт!</div>';
+        return;
+      }
+
+      const currency = document.getElementById('currency-select-hidden').value || '₽';
+      const fragment = document.createDocumentFragment();
+      history.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'history-date';
+        dateSpan.textContent = `${item.date} ${item.time}`;
+        div.appendChild(dateSpan);
+
+        const periodDiv = document.createElement('div');
+        periodDiv.style.cssText = 'margin-bottom:4px; font-size:clamp(16px, 1.6vw, 22px); color:var(--text-secondary);';
+        const monthName = MONTHS_RU[parseInt(item.month, 10) - 1] || '?';
+        periodDiv.textContent = `${monthName} ${item.year}`;
+        div.appendChild(periodDiv);
+
+        const amountDiv = document.createElement('div');
+        amountDiv.className = 'history-amount';
+        amountDiv.textContent = `Итого: ${formatMoney(item.total, currency)}`;
+        div.appendChild(amountDiv);
+
+        if (item.vacation > 0) {
+          const vacDiv = document.createElement('div');
+          vacDiv.style.cssText = 'font-size:clamp(14px, 1.4vw, 18px); color:var(--accent-purple); margin-top:4px;';
+          vacDiv.textContent = `(в т.ч. отпускные: ${formatMoney(item.vacation, currency)})`;
+          div.appendChild(vacDiv);
+        }
+
+        if (item.category) {
+          const tag = document.createElement('span');
+          tag.className = 'history-tag';
+          tag.textContent = item.category;
+          div.appendChild(tag);
+        }
+        if (item.note) {
+          const noteDiv = document.createElement('div');
+          noteDiv.className = 'history-note';
+          noteDiv.textContent = `📝 ${item.note}`;
+          div.appendChild(noteDiv);
+        }
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn edit-btn';
+        editBtn.textContent = '✏️';
+        editBtn.setAttribute('aria-label', 'Редактировать');
+        editBtn.onclick = function(e) { e.stopPropagation(); editHistoryItem(index); };
+        div.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'action-btn delete-btn';
+        delBtn.textContent = '×';
+        delBtn.setAttribute('aria-label', 'Удалить');
+        delBtn.onclick = function(e) { e.stopPropagation(); deleteHistoryItem(index); };
+        div.appendChild(delBtn);
+
+        fragment.appendChild(div);
+      });
+      list.innerHTML = '';
+      list.appendChild(fragment);
+    }
+
+    window.exportHistory = function() {
+      const history = getHistory();
+      if (history.length === 0) { showToast('История пуста', 2000); return; }
+      const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `salary_history_${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    };
+
+    window.importHistory = function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (Array.isArray(data)) {
+            setHistory(data);
+            renderHistory();
+            updateStats();
+            showToast('История импортирована', 2000);
+          } else { showToast('Неверный формат файла', 2500); }
+        } catch { showToast('Ошибка при чтении файла', 2500); }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    };
+
+    window.clearHistory = function() {
+      if (confirm('Удалить всю историю?')) {
+        setHistory([]);
+        renderHistory();
+        updateStats();
+        clearAll();
+      }
+    };
+
+    function getFilteredHistory(months) {
+      const history = getHistory();
+      if (history.length === 0) return [];
+      if (months === 'all') return history;
+      const limit = parseInt(months, 10);
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - limit);
+      return history.filter(item => {
+        const d = new Date(item.year, parseInt(item.month, 10) - 1);
+        return d >= cutoff;
+      });
+    }
+
+    window.updateStats = function(animate = true) {
+      const period = document.getElementById('stats-period').value || '6';
+      const data = getFilteredHistory(period);
+      const currency = document.getElementById('currency-select-hidden').value || '₽';
+
+      if (data.length === 0) {
+        document.getElementById('stat-avg').textContent = '-';
+        document.getElementById('stat-median').textContent = '-';
+        document.getElementById('stat-min').textContent = '-';
+        document.getElementById('stat-max').textContent = '-';
+        drawChart([]);
+        return;
+      }
+
+      const totals = data.map(item => item.total);
+      const sorted = [...totals].sort((a,b) => a - b);
+      const sum = totals.reduce((a,b) => a + b, 0);
+      const avg = sum / totals.length;
+      const median = sorted.length % 2 === 0 ? (sorted[sorted.length/2 - 1] + sorted[sorted.length/2]) / 2 : sorted[Math.floor(sorted.length/2)];
+      const min = sorted[0];
+      const max = sorted[sorted.length-1];
+
+      if (animate) {
+        animateNumber(document.getElementById('stat-avg'), avg, currency);
+        animateNumber(document.getElementById('stat-median'), median, currency);
+        animateNumber(document.getElementById('stat-min'), min, currency);
+        animateNumber(document.getElementById('stat-max'), max, currency);
+      } else {
+        document.getElementById('stat-avg').textContent = formatMoney(avg, currency);
+        document.getElementById('stat-median').textContent = formatMoney(median, currency);
+        document.getElementById('stat-min').textContent = formatMoney(min, currency);
+        document.getElementById('stat-max').textContent = formatMoney(max, currency);
+      }
+
+      drawChart(data);
+    };
+
+    function drawChart(data) {
+      const canvas = document.getElementById('salaryChart');
+      const ctx = canvas.getContext('2d');
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const displayWidth = Math.max(300, rect.width - 12);
+      const displayHeight = Math.max(200, displayWidth * 0.6);
+      canvas.width = displayWidth * dpr;
+      canvas.height = displayHeight * dpr;
+      canvas.style.width = displayWidth + 'px';
+      canvas.style.height = displayHeight + 'px';
+      ctx.scale(dpr, dpr);
+
+      const width = displayWidth;
+      const height = displayHeight;
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (data.length === 0) {
+        ctx.fillStyle = '#a0a5b0';
+        ctx.font = '24px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Нет данных', width/2, height/2);
+        return;
+      }
+
+      const sorted = [...data].sort((a,b) => {
+        const da = new Date(a.year, parseInt(a.month,10)-1);
+        const db = new Date(b.year, parseInt(b.month,10)-1);
+        return da - db;
+      });
+
+      const values = sorted.map(item => item.total);
+      const maxVal = Math.max(...values, 1);
+      const padding = 28;
+      const chartWidth = width - 2*padding;
+      const chartHeight = height - 2*padding;
+      const barWidth = Math.min(chartWidth / values.length * 0.5, 60);
+      const gap = (chartWidth - barWidth * values.length) / (values.length + 1);
+      const isLight = document.body.classList.contains('light-theme');
+      const textColor = isLight ? '#1a1c26' : '#ffffff';
+
+      ctx.fillStyle = textColor;
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+
+      values.forEach((val, i) => {
+        const x = padding + gap + i * (barWidth + gap);
+        const barHeight = (val / maxVal) * chartHeight;
+        const y = height - padding - barHeight;
+
+        ctx.fillStyle = '#9d4edd';
+        ctx.fillRect(x, y, barWidth, barHeight);
+
+        const item = sorted[i];
+        const monthLabel = MONTHS_RU[parseInt(item.month,10)-1]?.slice(0,3) || '';
+        ctx.fillStyle = textColor;
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(monthLabel, x + barWidth/2, height - padding + 24);
+        ctx.fillText(formatMoney(val, document.getElementById('currency-select-hidden').value || '₽'), x + barWidth/2, y - 10);
+      });
+    }
+
+    window.switchTab = function(tabId, el) {
+      document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+      const targetSection = document.getElementById(tabId);
+      if (targetSection) {
+        targetSection.classList.add('active');
+      }
+
+      if (el) {
+        el.classList.add('active');
+        el.setAttribute('aria-selected', 'true');
+      }
+
+      if (tabId === 'tab-calc') updateCalcDisplay();
+      if (tabId === 'tab-stats') updateStats(true);
+    };
+
+    function checkReminder() {
+      const settings = JSON.parse(localStorage.getItem('salary-settings') || '{}');
+      if (settings.notifications !== false) {
+        const day = parseInt(settings.reminderDay, 10);
+        const daysBefore = parseInt(settings.reminderDaysBefore, 10) || 0;
+        if (day && !isNaN(day)) {
+          const now = new Date();
+          const currentDay = now.getDate();
+          let startDay = day - daysBefore;
+          if (startDay < 1) startDay = 1;
+          if (currentDay >= startDay && currentDay <= day) {
+            const lastReminder = localStorage.getItem('salary-last-reminder');
+            const todayStr = now.toDateString();
+            if (lastReminder !== todayStr) {
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('📅 Напоминание о зарплате!', {
+                  body: `Сегодня день внесения данных (за ${daysBefore} дн. до). Не забудьте рассчитать зарплату!`,
+                  icon: 'icon-192.png'
+                });
+              } else {
+                alert('📅 Напоминание: сегодня день внесения данных о зарплате.');
+              }
+              localStorage.setItem('salary-last-reminder', todayStr);
+            }
+          }
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  })();
+</script>
+</body>
+</html>
