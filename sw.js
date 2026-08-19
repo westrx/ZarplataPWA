@@ -1,11 +1,24 @@
-const CACHE_NAME = 'salary-v1';
+// Версия кеша повышена, т.к. структура файлов изменилась
+// (приложение разбито на модули вместо одного index.html).
+const CACHE_NAME = 'salary-v2';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
-  // Если у вас есть другие файлы (CSS, JS – они встроены в index.html, так что не нужны)
+  './',
+  './index.html',
+  './manifest.json',
+  './css/styles.css',
+  './js/state.js',
+  './js/utils.js',
+  './js/dropdown.js',
+  './js/history-store.js',
+  './js/settings-store.js',
+  './js/input-panel.js',
+  './js/history-actions.js',
+  './js/analytics.js',
+  './js/calendar.js',
+  './js/navigation.js',
+  './js/app.js',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 // Установка – кешируем файлы
@@ -28,7 +41,7 @@ self.addEventListener('activate', (event) => {
         keys.filter((key) => key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
