@@ -48,7 +48,7 @@
         }
 
         drawChart(groupedData, currency);
-        updateTrendsAndForecast(rawData);
+        updateTrendsAndForecast(groupedData);
         renderHistoryList(rawData, currency);
       }
 
@@ -179,25 +179,31 @@
 
       function hideChartTooltip() { if (chartTooltip) chartTooltip.classList.remove('visible'); }
 
-      function updateTrendsAndForecast(data) {
+      // Принимает groupedData (агрегированные ПО МЕСЯЦАМ суммы, не сырые
+      // записи). БАГ (исправлено): раньше сюда передавались отдельные
+      // записи истории — если за один месяц было 2+ быстрых ввода
+      // (например, аванс и зарплата отдельно), тренд сравнивал их между
+      // собой как будто это разные периоды, хотя это один и тот же месяц.
+      // groupedData отсортирован по возрастанию даты (старые → новые),
+      // поэтому текущий месяц — последний элемент массива.
+      function updateTrendsAndForecast(groupedData) {
         const container = document.getElementById('trend-container');
         const forecastContainer = document.getElementById('forecast-container');
         if (!container || !forecastContainer) return;
-        if (data.length < 2) {
+        if (groupedData.length < 2) {
           container.innerHTML = '';
           forecastContainer.innerHTML = '';
           return;
         }
-        // history/data хранится в порядке "новые записи первыми" (unshift),
-        // поэтому текущая запись — это data[0], а не последний элемент массива.
-        const current = data[0]?.total || 0;
-        const previous = data[1]?.total || 0;
+        const current = groupedData[groupedData.length - 1]?.total || 0;
+        const previous = groupedData[groupedData.length - 2]?.total || 0;
         const diff = current - previous;
         const diffPercent = previous ? (diff / previous * 100) : 0;
         const trendIcon = diff > 0 ? '▲' : (diff < 0 ? '▼' : '•');
         container.innerHTML = `<div class="card" style="padding:10px; text-align:center; margin-bottom:8px;"><span style="font-size:clamp(16px,2vw,24px);">${trendIcon} ${diff > 0 ? 'Рост' : (diff < 0 ? 'Падение' : 'Стабильность')}</span><span style="font-size:clamp(14px,1.6vw,20px); margin-left:8px; color:var(--text-secondary);">${diff > 0 ? '+' : ''}${formatMoney(diff)} (${diffPercent.toFixed(1)}%)</span></div>`;
-        if (data.length >= 3) {
-          const monthlyAvg = data.slice(0, 6).reduce((s, item) => s + item.total, 0) / Math.min(data.length, 6);
+        if (groupedData.length >= 3) {
+          const recentMonths = groupedData.slice(-6);
+          const monthlyAvg = recentMonths.reduce((s, item) => s + item.total, 0) / recentMonths.length;
           const monthsLeft = 12 - new Date().getMonth() - 1;
           if (monthsLeft > 0) {
             const forecast = monthlyAvg * monthsLeft;

@@ -15,31 +15,6 @@
       }
 
 
-      window.clearAll = function() {
-        document.querySelectorAll('#tab-input input[type="text"]').forEach(el => el.value = '');
-        const vacationDateInput = document.getElementById('vacation-date');
-        if (vacationDateInput) vacationDateInput.value = todayLocalISO();
-        editingIndex = null;
-        const submitBtn = document.getElementById('btn-submit-advanced');
-        if (submitBtn) submitBtn.textContent = 'Сохранить сводку за месяц';
-        const today = todayLocalISO();
-        document.getElementById('quick-salary-amount').value = '';
-        document.getElementById('quick-salary-date').valueAsDate = new Date();
-        const triggerType = document.getElementById('trigger-type');
-        if (triggerType) {
-          triggerType.querySelector('.selected-value').textContent = 'Выплата (ЗП)';
-          document.getElementById('quick-salary-type').value = 'main';
-        }
-        const triggerCat = document.getElementById('trigger-category');
-        if (triggerCat) {
-          triggerCat.querySelector('.selected-value').textContent = 'Основная';
-          document.getElementById('quick-salary-cat').value = 'Основная';
-        }
-        updateCurrentMonthTotalVisual();
-        saveSettings();
-      };
-
-
       window.deleteHistoryItem = function(index) {
         const history = getHistory();
         if (index >= 0 && index < history.length) {
@@ -53,53 +28,7 @@
       window.editHistoryItem = function(index) {
         const history = getHistory();
         if (index < 0 || index >= history.length) return;
-        const item = history[index];
-
-        // Открываем шторку и ждём отрисовки
-        const panel = document.getElementById('advanced-salary-fields');
-        panel.classList.remove('hidden-field');
-        const btnStream = document.getElementById('btn-submit-stream');
-        if (btnStream) btnStream.style.display = 'none';
-
-        requestAnimationFrame(() => {
-          const paymentsTrigger = document.querySelector('#payments-trigger span:first-child');
-          if (paymentsTrigger) paymentsTrigger.textContent = String(item.paymentsCount || 1);
-          const paymentsInput = document.getElementById('payments-count');
-          if (paymentsInput) paymentsInput.value = String(item.paymentsCount || 1);
-          if (vacationToggle) {
-            if (item.hasVacation) vacationToggle.classList.add('active');
-            else vacationToggle.classList.remove('active');
-          }
-          if (splitToggle) {
-            if (item.hasUnofficial) splitToggle.classList.add('active');
-            else splitToggle.classList.remove('active');
-          }
-          updateFieldsVisibility();
-
-          const advanceInput = document.getElementById('input-advance');
-          if (advanceInput) advanceInput.value = item.advance || '';
-          const mainInput = document.getElementById('input-main');
-          if (mainInput) mainInput.value = item.mainPayment || '';
-          const vacationInput = document.getElementById('input-vacation');
-          if (vacationInput) vacationInput.value = item.vacation || '';
-          const unofficialInput = document.getElementById('input-unofficial');
-          if (unofficialInput) unofficialInput.value = item.unofficial || '';
-          const receivedInput = document.getElementById('received-date');
-          if (receivedInput) receivedInput.value = item.receivedDate || '';
-          const vacationDateInput = document.getElementById('vacation-date');
-          if (vacationDateInput) vacationDateInput.value = item.vacationDate || item.receivedDate || todayLocalISO();
-
-          const itemDate = new Date(item.receivedDate || item.date || Date.now());
-          if (!isNaN(itemDate)) {
-            document.getElementById('calc-month-value').innerText = MONTHS_RU[itemDate.getMonth()];
-            document.getElementById('calc-year-value').innerText = itemDate.getFullYear();
-          }
-
-          editingIndex = index;
-          const submitBtn = document.getElementById('btn-submit-advanced');
-          if (submitBtn) submitBtn.textContent = 'Обновить запись';
-          switchTab('tab-input', document.getElementById('nav-input'));
-        });
+        openEditModal(index, history[index]);
       };
 
 
@@ -141,7 +70,8 @@
         if (confirm('Вы точно хотите очистить всю историю?')) {
           setHistory([]);
           renderAnalytics();
-          clearAll();
+          updateCurrentMonthTotalVisual();
+          renderCalendar();
           showToast('История очищена', 2000);
           editingIndex = null;
         }

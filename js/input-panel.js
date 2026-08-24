@@ -1,45 +1,6 @@
 'use strict';
 // Вкладка «Ввод»: быстрый ввод, шторка «Полный расчёт месяца», авторасчёт.
 
-      const advanceBlock = document.getElementById('advance-block');
-      const vacationToggle = document.getElementById('vacation-toggle');
-      const vacationBlock = document.getElementById('vacation-block');
-      const splitToggle = document.getElementById('split-toggle');
-      const unofficialBlock = document.getElementById('unofficial-block');
-
-      function updateFieldsVisibility() {
-        const count = parseInt(document.getElementById('payments-count').value || '1', 10);
-        if (advanceBlock) {
-          if (count === 2) advanceBlock.classList.remove('hidden-field');
-          else advanceBlock.classList.add('hidden-field');
-        }
-        if (vacationBlock) {
-          if (vacationToggle && vacationToggle.classList.contains('active')) vacationBlock.classList.remove('hidden-field');
-          else vacationBlock.classList.add('hidden-field');
-        }
-        if (unofficialBlock) {
-          if (splitToggle && splitToggle.classList.contains('active')) unofficialBlock.classList.remove('hidden-field');
-          else unofficialBlock.classList.add('hidden-field');
-        }
-      }
-
-      window.toggleVacation = function() {
-        if (vacationToggle) {
-          vacationToggle.classList.toggle('active');
-          updateFieldsVisibility();
-          saveSettings();
-        }
-      };
-
-      window.toggleSplit = function() {
-        if (splitToggle) {
-          splitToggle.classList.toggle('active');
-          updateFieldsVisibility();
-          saveSettings();
-        }
-      };
-
-
       function initTriggers() {
         const triggers = document.querySelectorAll('.custom-select-trigger');
         if (!triggers.length) return;
@@ -50,33 +11,7 @@
             let options = [];
             let onSelect = null;
 
-            if (id === 'payments-trigger') {
-              const count = [1,2];
-              options = count.map(c => ({
-                value: String(c),
-                label: String(c),
-                selected: document.querySelector('#payments-trigger span:first-child').textContent === String(c)
-              }));
-              onSelect = (val) => {
-                document.querySelector('#payments-trigger span:first-child').textContent = val;
-                document.getElementById('payments-count').value = val;
-                updateFieldsVisibility();
-                saveSettings();
-              };
-            } else if (id === 'category-trigger') {
-              const cats = ['Основная','Подработка','Премия','Другое'];
-              options = cats.map(c => ({
-                value: c,
-                label: c,
-                selected: document.querySelector('#category-trigger span:first-child').textContent === c
-              }));
-              onSelect = (val) => {
-                document.querySelector('#category-trigger span:first-child').textContent = val;
-                document.getElementById('category-select-hidden').value = val;
-                toggleCustomCategoryVisibility();
-                saveSettings();
-              };
-            } else if (id === 'stats-trigger') {
+            if (id === 'stats-trigger') {
               const periods = [
                 {value:'3', label:'За 3 месяца'},
                 {value:'6', label:'За 6 месяцев'},
@@ -269,71 +204,101 @@
       }
 
 
-      function initAdvancedPanel() {
-        const panel = document.getElementById('advanced-salary-fields');
-        const btnSubmitStream = document.getElementById('btn-submit-stream');
+      const EDIT_TYPE_OPTIONS = [
+        { value: 'main', label: 'Выплата (ЗП)' },
+        { value: 'advance', label: 'Аванс' },
+        { value: 'vacation', label: 'Отпускные' },
+        { value: 'unofficial', label: 'В конверте' }
+      ];
+      const EDIT_CATEGORY_OPTIONS = [
+        { value: 'Основная', label: 'Основная' },
+        { value: 'Подработка', label: 'Подработка' },
+        { value: 'Премия', label: 'Премия' },
+        { value: 'Другое', label: 'Другое' }
+      ];
 
-        document.getElementById('btn-toggle-advanced').addEventListener('click', (e) => {
-          e.preventDefault();
-          const now = new Date();
-          document.getElementById('calc-month-value').innerText = MONTHS_RU[now.getMonth()];
-          document.getElementById('calc-year-value').innerText = now.getFullYear();
-          panel.classList.remove('hidden-field');
-          if (btnSubmitStream) btnSubmitStream.style.display = 'none';
-        });
+      function closeEditModal() {
+        const modal = document.getElementById('edit-modal');
+        if (modal) modal.classList.add('hidden-field');
+        editingIndex = null;
+      }
 
-        document.getElementById('btn-close-advanced').addEventListener('click', (e) => {
-          e.preventDefault();
-          panel.classList.add('hidden-field');
-          if (btnSubmitStream) btnSubmitStream.style.display = '';
-          editingIndex = null;
-          const submitBtn = document.getElementById('btn-submit-advanced');
-          if (submitBtn) submitBtn.textContent = 'Сохранить сводку за месяц';
-        });
+      // Открывает модалку редактирования, предзаполняя поля данными записи.
+      function openEditModal(index, item) {
+        editingIndex = index;
+        document.getElementById('edit-amount').value = item.total || '';
+        document.getElementById('edit-date').value = item.receivedDate || todayLocalISO();
 
-        document.getElementById('btn-submit-advanced').addEventListener('click', (e) => {
-          e.preventDefault();
-          const monthText = document.getElementById('calc-month-value').innerText;
-          const year = parseInt(document.getElementById('calc-year-value').innerText) || new Date().getFullYear();
-          const monthIdx = MONTHS_RU.indexOf(monthText);
-          if (monthIdx === -1) return showToast('Выберите месяц', 1500);
-          const wasEditing = editingIndex !== null;
-          const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-01`;
-          saveAdvancedMonthlyReport(dateStr);
-          panel.classList.add('hidden-field');
-          if (btnSubmitStream) btnSubmitStream.style.display = '';
-          e.currentTarget.textContent = 'Сохранить сводку за месяц';
-          showToast(wasEditing ? 'Запись обновлена' : 'Сводка сохранена', 2000);
-        });
+        let type = 'main';
+        if (item.hasAdvance) type = 'advance';
+        else if (item.hasVacation) type = 'vacation';
+        else if (item.hasUnofficial) type = 'unofficial';
+        const typeLabel = (EDIT_TYPE_OPTIONS.find(o => o.value === type) || EDIT_TYPE_OPTIONS[0]).label;
+        document.getElementById('edit-type').value = type;
+        document.querySelector('#edit-trigger-type .selected-value').textContent = typeLabel;
 
-        const triggerMonth = document.getElementById('trigger-calc-month');
-        if (triggerMonth) {
-          const monthOpts = MONTHS_RU.map((m, i) => ({ value: i.toString(), label: m }));
-          triggerMonth.addEventListener('click', function(e) {
+        const category = item.category || 'Основная';
+        document.getElementById('edit-category').value = category;
+        document.querySelector('#edit-trigger-category .selected-value').textContent = category;
+
+        document.getElementById('edit-modal').classList.remove('hidden-field');
+      }
+
+      function initEditModal() {
+        const triggerType = document.getElementById('edit-trigger-type');
+        if (triggerType) {
+          triggerType.addEventListener('click', function(e) {
             e.stopPropagation();
-            const currentText = document.getElementById('calc-month-value').innerText;
-            const opts = monthOpts.map(opt => ({ ...opt, selected: opt.label === currentText }));
+            const currentVal = document.getElementById('edit-type').value;
+            const opts = EDIT_TYPE_OPTIONS.map(opt => ({ ...opt, selected: opt.value === currentVal }));
             openDropdown(this, opts, (val, label) => {
-              document.getElementById('calc-month-value').innerText = label;
+              this.querySelector('.selected-value').textContent = label;
+              document.getElementById('edit-type').value = val;
             });
           });
         }
 
-        const triggerYear = document.getElementById('trigger-calc-year');
-        if (triggerYear) {
-          const currentYear = new Date().getFullYear();
-          const years = [];
-          for (let y = currentYear - 5; y <= currentYear + 5; y++) {
-            years.push({ value: y.toString(), label: y.toString() });
-          }
-          triggerYear.addEventListener('click', function(e) {
+        const triggerCat = document.getElementById('edit-trigger-category');
+        if (triggerCat) {
+          triggerCat.addEventListener('click', function(e) {
             e.stopPropagation();
-            const currentText = document.getElementById('calc-year-value').innerText;
-            const opts = years.map(opt => ({ ...opt, selected: opt.label === currentText }));
+            const currentVal = document.getElementById('edit-category').value;
+            const opts = EDIT_CATEGORY_OPTIONS.map(opt => ({ ...opt, selected: opt.value === currentVal }));
             openDropdown(this, opts, (val, label) => {
-              document.getElementById('calc-year-value').innerText = label;
+              this.querySelector('.selected-value').textContent = label;
+              document.getElementById('edit-category').value = val;
             });
           });
         }
+
+        document.getElementById('btn-close-edit').addEventListener('click', (e) => {
+          e.preventDefault();
+          closeEditModal();
+        });
+
+        document.getElementById('btn-save-edit').addEventListener('click', (e) => {
+          e.preventDefault();
+          const amount = parseNumberFromInput(document.getElementById('edit-amount').value);
+          if (amount <= 0) return showToast('Введите сумму', 1500);
+          const date = document.getElementById('edit-date').value || todayLocalISO();
+          const type = document.getElementById('edit-type').value;
+          const category = document.getElementById('edit-category').value;
+          updateHistoryRecord(editingIndex, amount, type, date, category);
+          closeEditModal();
+          updateCurrentMonthTotalVisual();
+          renderAnalytics();
+          renderCalendar();
+          showToast('Запись обновлена', 2000);
+        });
+
+        document.getElementById('btn-delete-edit').addEventListener('click', (e) => {
+          e.preventDefault();
+          const index = editingIndex;
+          closeEditModal();
+          deleteHistoryItem(index);
+          updateCurrentMonthTotalVisual();
+          renderCalendar();
+          showToast('Запись удалена', 2000);
+        });
       }
 

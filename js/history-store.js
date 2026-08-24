@@ -35,24 +35,17 @@
           if (!grouped[mainMonthKey]) {
             grouped[mainMonthKey] = { label: mainMonthName, total: 0, official: 0, unofficial: 0, paymentsList: [] };
           }
-          const officialForMain = (rec.mainPayment || 0) + (rec.unofficial || 0);
+          // БАГ (исправлено): раньше аванс искусственно "переносился" в
+          // следующий месяц относительно receivedDate, из-за чего аванс,
+          // введённый в конкретную дату, засчитывался в аналитике не туда,
+          // куда его поместил бы Календарь. Теперь аванс, как и зарплата,
+          // и конверт, учитывается в месяц СВОЕЙ реальной даты (той, что
+          // выбрана при вводе) — это совпадает с тем, что показывает Календарь.
+          const officialForMain = (rec.advance || 0) + (rec.mainPayment || 0) + (rec.unofficial || 0);
           grouped[mainMonthKey].total += officialForMain;
           grouped[mainMonthKey].official += officialForMain;
           grouped[mainMonthKey].unofficial += (rec.unofficial || 0);
           grouped[mainMonthKey].paymentsList.push(`${mainObj.getDate()} числа: ${formatMoney(officialForMain, currency)}`);
-
-          if (rec.advance && rec.advance > 0) {
-            const advFinancialDate = new Date(mainObj);
-            advFinancialDate.setMonth(advFinancialDate.getMonth() + 1);
-            const advKey = `${advFinancialDate.getFullYear()}-${String(advFinancialDate.getMonth()+1).padStart(2,'0')}`;
-            const advMonthName = advFinancialDate.toLocaleString('ru-RU', { month: 'short', year: '2-digit' });
-            if (!grouped[advKey]) {
-              grouped[advKey] = { label: advMonthName, total: 0, official: 0, unofficial: 0, paymentsList: [] };
-            }
-            grouped[advKey].total += rec.advance;
-            grouped[advKey].official += rec.advance;
-            grouped[advKey].paymentsList.push(`Аванс (учтён в этом месяце): ${formatMoney(rec.advance, currency)}`);
-          }
 
           const vacDateStr = rec.vacationDate || mainDate;
           if (rec.vacation && rec.vacation > 0 && vacDateStr) {
@@ -72,22 +65,6 @@
         return Object.keys(grouped).sort().map(key => grouped[key]);
       }
 
-
-      function gatherInputs() {
-        const advance = parseNumberFromInput(document.getElementById('input-advance')?.value || '');
-        const mainPayment = parseNumberFromInput(document.getElementById('input-main')?.value || '');
-        const vacation = parseNumberFromInput(document.getElementById('input-vacation')?.value || '');
-        const unofficial = parseNumberFromInput(document.getElementById('input-unofficial')?.value || '');
-        const vacationDate = document.getElementById('vacation-date')?.value || todayLocalISO();
-        let category = document.getElementById('category-select-hidden')?.value || 'Основная';
-        const custom = document.getElementById('custom-category')?.value?.trim() || '';
-        if (custom) category = custom;
-        const total = advance + mainPayment + vacation + unofficial;
-        const hasAdvance = advanceBlock ? !advanceBlock.classList.contains('hidden-field') : false;
-        const hasVacation = vacationBlock ? !vacationBlock.classList.contains('hidden-field') : false;
-        const hasUnofficial = unofficialBlock ? !unofficialBlock.classList.contains('hidden-field') : false;
-        return { advance: hasAdvance ? advance : 0, mainPayment, vacation: hasVacation ? vacation : 0, unofficial: hasUnofficial ? unofficial : 0, total, category, note: '', hasAdvance, hasVacation, hasUnofficial, paymentsCount: parseInt(document.getElementById('payments-count')?.value || '1', 10), vacationDate };
-      }
 
       function saveQuickPaymentToHistory(amount, type, date, category) {
         const history = getHistory();
@@ -112,36 +89,29 @@
       }
 
 
-      function saveAdvancedMonthlyReport(dateStr) {
-        const data = gatherInputs();
-        data.receivedDate = dateStr;
+      // Редактирование записи из модалки «Редактировать запись».
+      // Сохраняет ту же модель, что и быстрый ввод: одна запись = одна
+      // выплата одного типа с одной датой. id записи не меняется.
+      function updateHistoryRecord(index, amount, type, date, category) {
         const history = getHistory();
-        const now = new Date();
-        const preservedId = (editingIndex !== null && history[editingIndex]) ? history[editingIndex].id : null;
+        if (index < 0 || index >= history.length) return;
+        const existing = history[index];
         const record = {
-          id: preservedId || genRecordId(),
-          date: now.toLocaleDateString('ru-RU'),
-          time: now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-          receivedDate: dateStr,
-          advance: data.advance,
-          mainPayment: data.mainPayment,
-          vacation: data.vacation,
-          unofficial: data.unofficial,
-          total: data.total,
-          category: data.category,
-          note: data.note,
-          hasAdvance: data.hasAdvance,
-          hasVacation: data.hasVacation,
-          hasUnofficial: data.hasUnofficial,
-          paymentsCount: data.paymentsCount,
-          vacationDate: data.vacationDate
+          id: existing.id,
+          date: existing.date,
+          time: existing.time,
+          receivedDate: date,
+          advance: 0, mainPayment: 0, vacation: 0, unofficial: 0, total: amount,
+          category, note: existing.note || '', hasAdvance: false, hasVacation: false, hasUnofficial: false,
+          paymentsCount: 1, vacationDate: date
         };
-        if (editingIndex !== null && editingIndex >= 0 && editingIndex < history.length) {
-          history[editingIndex] = record;
-          editingIndex = null;
-        } else {
-          history.unshift(record);
+        switch (type) {
+          case 'advance': record.advance = amount; record.hasAdvance = true; break;
+          case 'main': record.mainPayment = amount; break;
+          case 'vacation': record.vacation = amount; record.hasVacation = true; record.vacationDate = date; break;
+          case 'unofficial': record.unofficial = amount; record.hasUnofficial = true; break;
         }
+        history[index] = record;
         setHistory(history);
         renderAnalytics();
       }

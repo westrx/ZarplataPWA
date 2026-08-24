@@ -6,8 +6,6 @@
         chartTooltip = document.getElementById('chart-tooltip');
 
         const hiddenInputs = `
-          <input type="hidden" id="payments-count" value="1">
-          <input type="hidden" id="category-select-hidden" value="Основная">
           <input type="hidden" id="stats-period" value="6">
           <input type="hidden" id="reminder-days-before" value="3">
           <input type="hidden" id="currency-select-hidden" value="₽">
@@ -22,44 +20,17 @@
         initTriggers();
         initNewInputScreen();
         initQuickCustomSelects();
-        initAdvancedPanel();
+        initEditModal();
 
-        const customCategory = document.getElementById('custom-category');
-        if (customCategory) {
-          customCategory.addEventListener('input', function() {
-            if (this.value.trim() !== '') {
-              const hidden = document.getElementById('category-select-hidden');
-              if (hidden) hidden.value = 'Другое';
-              const trigger = document.querySelector('#category-trigger span:first-child');
-              if (trigger) trigger.textContent = 'Другое';
-              toggleCustomCategoryVisibility();
-            } else {
-              toggleCustomCategoryVisibility();
-            }
-            saveSettings();
-          });
-        }
-
-        const receivedDate = document.getElementById('received-date');
-        if (receivedDate) receivedDate.addEventListener('change', saveSettings);
-
-        const inputFields = document.querySelectorAll('#tab-input input[type="text"]');
-        inputFields.forEach(inp => {
-          inp.addEventListener('input', function() {
-            this.value = cleanNumberInput(this.value);
-            saveSettings();
-          });
-          inp.addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            const panel = document.getElementById('advanced-salary-fields');
-            const isAdvancedOpen = panel && !panel.classList.contains('hidden-field');
-            const btn = document.getElementById(isAdvancedOpen ? 'btn-submit-advanced' : 'btn-submit-stream');
-            if (btn) btn.click();
-          });
+        document.getElementById('quick-salary-amount').addEventListener('input', function() {
+          this.value = cleanNumberInput(this.value);
+        });
+        document.getElementById('quick-salary-amount').addEventListener('keydown', function(e) {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          document.getElementById('btn-submit-stream').click();
         });
 
-        clearAll();
         const defaultStats = document.getElementById('default-stats-period')?.value || '6';
         const statsPeriod = document.getElementById('stats-period');
         if (statsPeriod) statsPeriod.value = defaultStats;

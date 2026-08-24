@@ -2,24 +2,19 @@
 // Настройки приложения: сохранение/загрузка из localStorage.
 
       function saveSettings() {
-        const paymentsCount = document.getElementById('payments-count').value || '1';
-        const category = document.getElementById('category-select-hidden').value || 'Основная';
-        const customCategory = document.getElementById('custom-category') ? document.getElementById('custom-category').value : '';
         const reminderDays = document.getElementById('reminder-days-before').value || '3';
         const currency = document.getElementById('currency-select-hidden').value || '₽';
         const defaultStats = document.getElementById('default-stats-period').value || '6';
         const paydayAdvance = document.getElementById('payday-advance') ? document.getElementById('payday-advance').value : '';
         const paydayMain = document.getElementById('payday-main') ? document.getElementById('payday-main').value : '';
         const paydayUnofficial = document.getElementById('payday-unofficial') ? document.getElementById('payday-unofficial').value : '';
-        const receivedDate = document.getElementById('received-date') ? document.getElementById('received-date').value : '';
-        const vacationDate = document.getElementById('vacation-date') ? document.getElementById('vacation-date').value : todayLocalISO();
+        // Тип и категория, выбранные в «Быстром вводе» — раньше не сохранялись,
+        // хотя saveSettings() и вызывался при их выборе (сохранялись только
+        // поля старой шторки). Теперь запоминаем реально используемые поля.
+        const quickType = document.getElementById('quick-salary-type') ? document.getElementById('quick-salary-type').value : 'main';
+        const quickCategory = document.getElementById('quick-salary-cat') ? document.getElementById('quick-salary-cat').value : 'Основная';
 
         const settings = {
-          paymentsCount,
-          hasVacation: vacationToggle ? vacationToggle.classList.contains('active') : false,
-          hasSplit: splitToggle ? splitToggle.classList.contains('active') : false,
-          category,
-          customCategory,
           theme: document.body.classList.contains('light-theme') ? 'light' : 'dark',
           notifications: document.getElementById('notifications-toggle') ? document.getElementById('notifications-toggle').classList.contains('active') : true,
           reminderDaysBefore: reminderDays,
@@ -30,13 +25,9 @@
           paydayAdvance,
           paydayMain,
           paydayUnofficial,
-          receivedDate,
-          vacationDate,
-          inputValues: {}
+          quickType,
+          quickCategory
         };
-        document.querySelectorAll('#tab-input input[type="text"]').forEach(inp => {
-          settings.inputValues[inp.id] = inp.value;
-        });
         localStorage.setItem('salary-settings', JSON.stringify(settings));
       }
 
@@ -45,27 +36,6 @@
         if (saved) {
           try {
             const settings = JSON.parse(saved);
-            const paymentsTrigger = document.querySelector('#payments-trigger span:first-child');
-            if (paymentsTrigger) paymentsTrigger.textContent = settings.paymentsCount || '1';
-            const paymentsInput = document.getElementById('payments-count');
-            if (paymentsInput) paymentsInput.value = settings.paymentsCount || '1';
-
-            if (vacationToggle) {
-              if (settings.hasVacation) vacationToggle.classList.add('active');
-              else vacationToggle.classList.remove('active');
-            }
-            if (splitToggle) {
-              if (settings.hasSplit) splitToggle.classList.add('active');
-              else splitToggle.classList.remove('active');
-            }
-
-            const categoryTrigger = document.querySelector('#category-trigger span:first-child');
-            if (categoryTrigger) categoryTrigger.textContent = settings.category || 'Основная';
-            const categoryHidden = document.getElementById('category-select-hidden');
-            if (categoryHidden) categoryHidden.value = settings.category || 'Основная';
-            const customCat = document.getElementById('custom-category');
-            if (customCat) customCat.value = settings.customCategory || '';
-            toggleCustomCategoryVisibility();
 
             if (settings.theme === 'light') {
               document.body.classList.add('light-theme');
@@ -148,28 +118,20 @@
               if (hidden) hidden.value = val;
             }
 
-            if (settings.receivedDate) {
-              const received = document.getElementById('received-date');
-              if (received) received.value = settings.receivedDate;
-            } else {
-              const today = todayLocalISO();
-              const received = document.getElementById('received-date');
-              if (received) received.value = today;
+            const quickTypeOptions = { main: 'Выплата (ЗП)', advance: 'Аванс', vacation: 'Отпускные', unofficial: 'В конверте' };
+            const quickType = settings.quickType || 'main';
+            const triggerType = document.getElementById('trigger-type');
+            if (triggerType) {
+              triggerType.querySelector('.selected-value').textContent = quickTypeOptions[quickType] || quickTypeOptions.main;
+              document.getElementById('quick-salary-type').value = quickType;
+            }
+            const quickCategory = settings.quickCategory || 'Основная';
+            const triggerCat = document.getElementById('trigger-category');
+            if (triggerCat) {
+              triggerCat.querySelector('.selected-value').textContent = quickCategory;
+              document.getElementById('quick-salary-cat').value = quickCategory;
             }
 
-            const vacDateInput = document.getElementById('vacation-date');
-            if (vacDateInput) {
-              vacDateInput.value = settings.vacationDate || todayLocalISO();
-            }
-
-            if (settings.inputValues) {
-              Object.keys(settings.inputValues).forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = settings.inputValues[id];
-              });
-            }
-
-            updateFieldsVisibility();
             if (autoToggle && autoToggle.classList.contains('active')) {
               enableAutoCalc();
             } else {
@@ -181,21 +143,6 @@
 
           } catch(e) {}
         } else {
-          const today = todayLocalISO();
-          const received = document.getElementById('received-date');
-          if (received) received.value = today;
-          const paymentsTrigger = document.querySelector('#payments-trigger span:first-child');
-          if (paymentsTrigger) paymentsTrigger.textContent = '1';
-          const paymentsInput = document.getElementById('payments-count');
-          if (paymentsInput) paymentsInput.value = '1';
-          if (vacationToggle) vacationToggle.classList.remove('active');
-          if (splitToggle) splitToggle.classList.remove('active');
-          const categoryTrigger = document.querySelector('#category-trigger span:first-child');
-          if (categoryTrigger) categoryTrigger.textContent = 'Основная';
-          const categoryHidden = document.getElementById('category-select-hidden');
-          if (categoryHidden) categoryHidden.value = 'Основная';
-          const customCat = document.getElementById('custom-category');
-          if (customCat) customCat.value = '';
           const themeToggle = document.getElementById('theme-toggle');
           if (themeToggle) themeToggle.classList.add('active');
           const notifToggle = document.getElementById('notifications-toggle');
@@ -206,8 +153,6 @@
           if (reminderTrigger) reminderTrigger.textContent = '3 дня';
           const reminderDaysInput = document.getElementById('reminder-days-before');
           if (reminderDaysInput) reminderDaysInput.value = '3';
-          const autoToggle = document.getElementById('auto-calc-toggle');
-          if (autoToggle) autoToggle.classList.remove('active');
           const currencyTrigger = document.querySelector('#currency-trigger span:first-child');
           if (currencyTrigger) currencyTrigger.textContent = '₽ (Рубль)';
           const currencyHidden = document.getElementById('currency-select-hidden');
@@ -218,36 +163,12 @@
           if (defaultStatsInput) defaultStatsInput.value = '6';
           const advanceTrigger = document.querySelector('#payday-advance-trigger span:first-child');
           if (advanceTrigger) advanceTrigger.textContent = '—';
-          const advanceHidden = document.getElementById('payday-advance');
-          if (advanceHidden) advanceHidden.value = '';
           const mainTrigger = document.querySelector('#payday-main-trigger span:first-child');
           if (mainTrigger) mainTrigger.textContent = '—';
-          const mainHidden = document.getElementById('payday-main');
-          if (mainHidden) mainHidden.value = '';
           const unofficTrigger = document.querySelector('#payday-unofficial-trigger span:first-child');
           if (unofficTrigger) unofficTrigger.textContent = '—';
-          const unofficHidden = document.getElementById('payday-unofficial');
-          if (unofficHidden) unofficHidden.value = '';
-          const vacDateInput = document.getElementById('vacation-date');
-          if (vacDateInput) vacDateInput.value = today;
-          document.querySelectorAll('#tab-input input[type="text"]').forEach(inp => inp.value = '');
-          updateFieldsVisibility();
           saveSettings();
           renderAnalytics();
           renderCalendar();
-        }
-      }
-
-      function toggleCustomCategoryVisibility() {
-        const category = document.getElementById('category-select-hidden');
-        const wrapper = document.getElementById('custom-category-wrapper');
-        const customInput = document.getElementById('custom-category');
-        if (!category || !wrapper || !customInput) return;
-        if (category.value === 'Другое' || customInput.value.trim() !== '') {
-          wrapper.style.display = 'block';
-          if (category.value === 'Другое') customInput.focus();
-        } else {
-          wrapper.style.display = 'none';
-          customInput.value = '';
         }
       }

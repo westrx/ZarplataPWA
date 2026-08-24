@@ -14,10 +14,10 @@
           const nw = document.getElementById('nav-wrapper');
           if (nw) nw.classList.remove('hidden');
         } else {
-          const panel = document.getElementById('advanced-salary-fields');
-          if (panel && !panel.classList.contains('hidden-field')) {
-            panel.classList.add('hidden-field');
-            const btn = document.getElementById('btn-submit-stream'); if (btn) btn.style.display = '';
+          const modal = document.getElementById('edit-modal');
+          if (modal && !modal.classList.contains('hidden-field')) {
+            modal.classList.add('hidden-field');
+            editingIndex = null;
           }
         }
         if (shouldVibrate) vibrateIfSafe();
