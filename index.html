@@ -29,7 +29,6 @@
               <div style="flex: 0.9;"><label style="font-size: 13px;">Когда</label><input type="date" id="quick-salary-date" style="width: 100%; padding: 10px; background: var(--input-bg); color: white; border: 1px solid var(--glass-border); border-radius: var(--radius-sm); min-height: 44px; font-size: 13px;"></div>
             </div>
           </div>
-          <button id="btn-toggle-advanced" class="btn-secondary" style="margin-bottom: 12px; padding: 10px; font-size: 14px; width: 100%;"><svg class="svg-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>Полный расчёт месяца (сводка)</button>
           <button id="btn-submit-stream" style="width: 100%; margin-top: 0; padding: 18px; font-size: 20px;"><svg class="svg-icon large" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить выплату</button>
         </div>
       </section>
@@ -58,17 +57,21 @@
     </div>
   </main>
 
-  <!-- Шторка полного расчёта -->
-  <div id="advanced-salary-fields" class="hidden-field fullscreen-advanced">
-    <div style="width:100%;flex-shrink:0;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h2 style="font-size:22px;color:var(--text-main);">Полный расчёт месяца</h2><button id="btn-close-advanced" class="btn-secondary" style="width:auto;padding:6px 12px;margin:0;font-size:14px;">Закрыть</button></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--glass-border);"><span style="color:var(--text-secondary);font-size:14px;">Расчётный период:</span><div style="flex:1;position:relative;"><div class="custom-select-trigger small" id="trigger-calc-month" tabindex="0"><span class="selected-value" id="calc-month-value">Июль</span><span class="arrow">▼</span></div></div><div style="flex:0.8;position:relative;"><div class="custom-select-trigger small" id="trigger-calc-year" tabindex="0"><span class="selected-value" id="calc-year-value">2026</span><span class="arrow">▼</span></div></div></div>
+  <!-- Модалка редактирования записи -->
+  <div id="edit-modal" class="hidden-field modal-overlay">
+    <div class="modal-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;"><h2 style="font-size:20px;color:var(--text-main);">Редактировать запись</h2><button id="btn-close-edit" class="btn-secondary" style="width:auto;padding:6px 12px;margin:0;font-size:14px;">Закрыть</button></div>
+      <div style="margin-bottom:12px;"><label>Сумма</label><input type="text" id="edit-amount" inputmode="decimal" placeholder="0 ₽" class="calc-input"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;">
+        <div style="flex:1;position:relative;"><label style="font-size:13px;">Тип</label><div class="custom-select-trigger small" id="edit-trigger-type" tabindex="0"><span class="selected-value">Выплата (ЗП)</span><span class="arrow">▼</span></div><input type="hidden" id="edit-type" value="main"></div>
+        <div style="flex:1;position:relative;"><label style="font-size:13px;">Категория</label><div class="custom-select-trigger small" id="edit-trigger-category" tabindex="0"><span class="selected-value">Основная</span><span class="arrow">▼</span></div><input type="hidden" id="edit-category" value="Основная"></div>
+      </div>
+      <div style="margin-bottom:20px;"><label style="font-size:13px;">Когда</label><input type="date" id="edit-date" style="width:100%;padding:10px;background:var(--input-bg);color:white;border:1px solid var(--glass-border);border-radius:var(--radius-sm);min-height:44px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button id="btn-delete-edit" class="btn-clear" style="flex:1;"><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Удалить</button>
+        <button id="btn-save-edit" style="flex:2;margin-top:0;">Сохранить</button>
+      </div>
     </div>
-    <div class="advanced-fields-scroll-zone">
-      <div class="card"><div class="settings-grid" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px;"><div class="setting-item"><label>Кол-во выплат:</label><div class="custom-select-trigger small" id="payments-trigger"><span>2</span><span class="arrow">▼</span></div></div><div class="setting-item"><label>Отпускные</label><div id="vacation-toggle" class="toggle-switch active" onclick="toggleVacation()"></div></div><div class="setting-item"><label>Раздельный учёт</label><div id="split-toggle" class="toggle-switch" onclick="toggleSplit()"></div></div></div></div>
-      <div class="card"><div id="advance-block" class="hidden-field" style="margin-bottom:8px;"><label>Аванс (прошлый месяц), ₽</label><input type="text" id="input-advance" placeholder="0" inputmode="decimal"></div><div style="margin-bottom:8px;"><label>Первая выплата (текущий месяц), ₽</label><input type="text" id="input-main" placeholder="0" inputmode="decimal"></div><div id="vacation-block" style="margin-bottom:8px;"><label>Отпускные, ₽</label><div class="vacation-row"><input type="date" id="vacation-date"><input type="text" id="input-vacation" placeholder="0" inputmode="decimal"></div></div><div id="unofficial-block" class="hidden-field"><label>Дополнительно (в конверте), ₽</label><input type="text" id="input-unofficial" placeholder="0" inputmode="decimal"></div><div style="display:flex;gap:8px;margin-top:8px;"><button class="btn-clear" onclick="clearAll()"><svg class="svg-icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Очистить</button></div></div>
-    </div>
-    <div style="width:100%;flex-shrink:0;"><button id="btn-submit-advanced" style="width:100%;margin-top:0;padding:16px;font-size:18px;">Сохранить сводку за месяц</button></div>
   </div>
 
   <div id="toast" class="toast"></div>

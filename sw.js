@@ -1,6 +1,6 @@
 // Версия кеша повышена, т.к. структура файлов изменилась
 // (приложение разбито на модули вместо одного index.html).
-const CACHE_NAME = 'salary-v2';
+const CACHE_NAME = 'salary-v3';
 const ASSETS = [
   './',
   './index.html',
