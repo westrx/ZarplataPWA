@@ -1,133 +1,126 @@
-'use strict';
-// Переключение вкладок, свайп-навигация, переключатели темы/уведомлений,
-// напоминания о днях выплат.
+// Навигация между вкладками (с индикатором-подложкой), свайпы,
+// переключатели темы/подсказок/уведомлений, напоминания о выплатах
 
-      window.switchTab = function(tabId, el, shouldVibrate = false) {
-        document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-        const target = document.getElementById(tabId);
-        if (target) target.classList.add('active');
-        if (el) { el.classList.add('active'); el.setAttribute('aria-selected', 'true'); }
-        if (tabId === 'tab-analytics') renderAnalytics();
-        if (tabId === 'tab-calendar') renderCalendar();
-        if (tabId === 'tab-input') {
-          const nw = document.getElementById('nav-wrapper');
-          if (nw) nw.classList.remove('hidden');
-        } else {
-          const modal = document.getElementById('edit-modal');
-          if (modal && !modal.classList.contains('hidden-field')) {
-            modal.classList.add('hidden-field');
-            editingIndex = null;
-          }
-        }
-        if (shouldVibrate) vibrateIfSafe();
-      };
+function switchTab(tabId, navButton, userAction) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  const sec = document.getElementById(tabId);
+  if (sec) sec.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (navButton) navButton.classList.add('active');
+  moveNavIndicator(navButton || document.querySelector('.nav-item.active'));
+  if (tabId === 'tab-analytics') renderAnalytics();
+  if (tabId === 'tab-input') { updateCurrentMonthTotalVisual(); updateDebtBadge(); updateCountdown(); }
+  if (tabId !== 'tab-input') {
+    const m = document.getElementById('edit-modal');
+    if (m && !m.classList.contains('hidden-field')) closeEditModal();
+  }
+  if (window.innerWidth <= 768) window.scrollTo(0, 0);
+}
 
-      function initSwipeNavigation() {
-        const wrapper = document.querySelector('.sections-wrapper');
-        if (!wrapper) return;
+function moveNavIndicator(btn) {
+  const ind = document.getElementById('nav-indicator');
+  if (!ind || !btn) return;
+  const nav = btn.parentElement;
+  const navRect = nav.getBoundingClientRect();
+  const r = btn.getBoundingClientRect();
+  ind.style.width = r.width + 'px';
+  ind.style.transform = `translateX(${r.left - navRect.left}px)`;
+}
 
-        let touchStartX = 0;
-        let touchStartY = 0;
+function toggleTheme() {
+  document.body.classList.toggle('light-theme');
+  saveSettings();
+  renderAnalytics();
+  renderCalendar();
+}
 
-        wrapper.addEventListener('touchstart', (e) => {
-          touchStartX = e.changedTouches[0].screenX;
-          touchStartY = e.changedTouches[0].screenY;
-        }, { passive: true });
+function toggleHints() {
+  const t = document.getElementById('hints-toggle');
+  if (t) t.classList.toggle('active');
+  saveSettings();
+}
 
-        wrapper.addEventListener('touchend', (e) => {
-          const touchEndX = e.changedTouches[0].screenX;
-          const touchEndY = e.changedTouches[0].screenY;
-          const diffX = touchEndX - touchStartX;
-          const diffY = touchEndY - touchStartY;
+function toggleNotifications() {
+  const t = document.getElementById('notifications-toggle');
+  if (!t) return;
+  t.classList.toggle('active');
+  if (t.classList.contains('active')) enableNotifications(); else disableNotifications();
+  saveSettings();
+}
 
-          if (Math.abs(diffX) > Math.abs(diffY) * 2 && Math.abs(diffX) > 50) {
-            const tabs = ['tab-input', 'tab-analytics', 'tab-calendar', 'tab-settings'];
-            const currentTab = document.querySelector('section.active')?.id;
-            let currentIndex = tabs.indexOf(currentTab);
-            if (currentIndex === -1) return;
+function enableNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') showToast('Уведомления включены', 2000);
+    });
+  }
+}
 
-            if (diffX < -50) {
-              currentIndex = Math.min(currentIndex + 1, tabs.length - 1);
-            } else if (diffX > 50) {
-              currentIndex = Math.max(currentIndex - 1, 0);
-            }
-            const targetTab = document.getElementById(tabs[currentIndex]);
-            // БАГ (исправлено): раньше искали кнопку навигации через
-            // [aria-controls="..."], но такого атрибута нет в разметке —
-            // targetNav всегда был null, и свайп не переключал вкладку.
-            const targetNav = document.getElementById('nav-' + tabs[currentIndex].replace('tab-', ''));
-            if (targetTab && targetNav) {
-              switchTab(tabs[currentIndex], targetNav, true);
-            }
-          }
-        }, { passive: true });
+function disableNotifications() { showToast('Уведомления выключены', 2000); }
+
+function checkPaydayReminders() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  let settings = {};
+  try { settings = JSON.parse(localStorage.getItem('salary-settings')) || {}; } catch (e) { return; }
+  if (!settings.notificationsEnabled) return;
+  const today = new Date();
+  const todayStr = toISODate(today);
+  if (localStorage.getItem('last-reminder') === todayStr) return;
+  const daysBefore = parseInt(settings.reminderDays != null ? settings.reminderDays : '3', 10);
+  const map = {};
+  if (settings.paydayMain) map[settings.paydayMain] = 'основная выплата';
+  if (settings.paydayAdvance) map[settings.paydayAdvance] = 'аванс';
+  if (settings.paydayUnofficial) map[settings.paydayUnofficial] = 'конверт';
+  const paydays = Object.keys(map).map(Number);
+  if (!paydays.length) return;
+  const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let fired = false;
+  for (const target of paydays) {
+    for (let shift = 0; shift <= 1; shift++) {
+      let m = today.getMonth() + shift, y = today.getFullYear();
+      if (m > 11) { m = 0; y++; }
+      const actual = getActualPayday(target, m, y);
+      const payDate = new Date(y, m, actual);
+      const diffDays = Math.round((payDate - today0) / 86400000);
+      if (diffDays >= 0 && diffDays <= daysBefore) {
+        const body = diffDays === 0 ? 'Сегодня день выплаты!' : `Через ${diffDays} дн. (${payDate.toLocaleDateString('ru-RU')})`;
+        try { new Notification('Зарплата: напоминание', { body: `${map[target]}: ${body}` }); } catch (e) {}
+        fired = true;
+        break;
       }
+    }
+  }
+  if (fired) localStorage.setItem('last-reminder', todayStr);
+}
 
-      window.toggleTheme = function() {
-        const toggle = document.getElementById('theme-toggle');
-        if (!toggle) return;
-        const isDark = toggle.classList.contains('active');
-        if (isDark) { document.body.classList.add('light-theme'); toggle.classList.remove('active'); }
-        else { document.body.classList.remove('light-theme'); toggle.classList.add('active'); }
-        saveSettings();
-      };
-
-      window.toggleNotifications = function() {
-        const toggle = document.getElementById('notifications-toggle');
-        if (!toggle) return;
-        toggle.classList.toggle('active');
-        if (toggle.classList.contains('active')) {
-          if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission().then(perm => {
-              if (perm !== 'granted') { toggle.classList.remove('active'); showToast('Разрешите уведомления в браузере', 3000); }
-            });
-          } else if ('Notification' in window && Notification.permission === 'denied') { toggle.classList.remove('active'); showToast('Уведомления запрещены', 3000); }
-        }
-        saveSettings();
-      };
-
-      window.toggleHints = function() { const t = document.getElementById('hints-toggle'); if (t) { t.classList.toggle('active'); saveSettings(); } };
-      window.toggleAutoCalc = function() { const t = document.getElementById('auto-calc-toggle'); if (t) { t.classList.toggle('active'); saveSettings(); if (t.classList.contains('active')) enableAutoCalc(); else disableAutoCalc(); } };
-
-      function checkPaydayReminders() {
-        const settings = JSON.parse(localStorage.getItem('salary-settings') || '{}');
-        if (settings.notifications === false) return;
-
-        const daysBefore = parseInt(settings.reminderDaysBefore, 10) || 0;
-        const advanceDay = parseInt(settings.paydayAdvance) || null;
-        const mainDay = parseInt(settings.paydayMain) || null;
-        const unofficialDay = parseInt(settings.paydayUnofficial) || null;
-
-        const today = new Date();
-        const currentDay = today.getDate();
-        const todayStr = today.toDateString();
-
-        const checkDay = (targetDay, label) => {
-          if (!targetDay) return false;
-          const startDay = Math.max(1, targetDay - daysBefore);
-          if (currentDay >= startDay && currentDay <= targetDay) {
-            const lastKey = `last-reminder-${label}`;
-            const last = localStorage.getItem(lastKey);
-            if (last !== todayStr) {
-              localStorage.setItem(lastKey, todayStr);
-              return true;
-            }
-          }
-          return false;
-        };
-
-        const reminders = [];
-        if (checkDay(advanceDay, 'advance')) reminders.push('Аванс');
-        if (checkDay(mainDay, 'main')) reminders.push('Первая выплата');
-        if (checkDay(unofficialDay, 'unofficial')) reminders.push('Конверт');
-
-        if (reminders.length > 0) {
-          const body = `Сегодня день выплаты: ${reminders.join(', ')}.\nНе забудьте рассчитать зарплату!`;
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('📅 Напоминание о выплате', { body, icon: '/icons/icon-192.png' });
-          } else {
-            showToast(`📅 ${body}`, 3000);
-          }
-        }
-      }
+// Свайпы между вкладками
+function initSwipeNavigation() {
+  const wrapper = document.querySelector('.sections-wrapper');
+  if (!wrapper) return;
+  const tabs = ['tab-input', 'tab-analytics', 'tab-calendar', 'tab-settings'];
+  let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+  wrapper.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+  wrapper.addEventListener('touchend', (e) => {
+    if (!touchStartTime) return;
+    const diffX = e.changedTouches[0].clientX - touchStartX;
+    const diffY = e.changedTouches[0].clientY - touchStartY;
+    const elapsed = Date.now() - touchStartTime;
+    touchStartTime = 0;
+    if (elapsed > 800) return;
+    if (Math.abs(diffX) < 60 || Math.abs(diffX) < Math.abs(diffY) * 2) return;
+    const active = document.querySelector('section.active');
+    if (!active) return;
+    const idx = tabs.indexOf(active.id);
+    if (idx === -1) return;
+    const nextIdx = diffX > 0 ? idx - 1 : idx + 1;
+    if (nextIdx < 0 || nextIdx >= tabs.length) return;
+    const nextNav = document.getElementById('nav-' + tabs[nextIdx].split('-')[1]);
+    if (nextNav) switchTab(tabs[nextIdx], nextNav, true);
+  }, { passive: true });
+}

@@ -1,95 +1,113 @@
-'use strict';
-// Точка входа: инициализация всего приложения при загрузке DOM,
-// регистрация Service Worker, обработка событий online/offline.
+// Инициализация приложения
 
-      function init() {
-        chartTooltip = document.getElementById('chart-tooltip');
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 
-        const hiddenInputs = `
-          <input type="hidden" id="stats-period" value="6">
-          <input type="hidden" id="reminder-days-before" value="3">
-          <input type="hidden" id="currency-select-hidden" value="₽">
-          <input type="hidden" id="default-stats-period" value="6">
-          <input type="hidden" id="payday-advance" value="">
-          <input type="hidden" id="payday-main" value="">
-          <input type="hidden" id="payday-unofficial" value="">
-        `;
-        document.body.insertAdjacentHTML('beforeend', hiddenInputs);
+function init() {
+  chartTooltip = document.getElementById('chart-tooltip');
 
-        loadSettings();
-        initTriggers();
-        initNewInputScreen();
-        initQuickCustomSelects();
-        initEditModal();
+  // Скрытые инпуты, хранящие значения настроек
+  const hiddenInputs = [
+    { id: 'payday-advance', value: '25' },
+    { id: 'payday-main', value: '10' },
+    { id: 'payday-unofficial', value: '15' },
+    { id: 'currency', value: '₽' },
+    { id: 'reminder-days', value: '3' },
+    { id: 'default-stats', value: '6' },
+    { id: 'stats-period', value: '6' }
+  ];
+  hiddenInputs.forEach(h => {
+    if (!document.getElementById(h.id)) {
+      const inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.id = h.id;
+      inp.value = h.value;
+      document.body.appendChild(inp);
+    }
+  });
 
-        document.getElementById('quick-salary-amount').addEventListener('input', function() {
-          this.value = cleanNumberInput(this.value);
-        });
-        document.getElementById('quick-salary-amount').addEventListener('keydown', function(e) {
-          if (e.key !== 'Enter') return;
-          e.preventDefault();
-          document.getElementById('btn-submit-stream').click();
-        });
+  initTriggers();
+  initCalendar();
+  loadSettings();
+  initNewInputScreen();
+  initEditModal();
+  initQuickCustomSelects();
 
-        const defaultStats = document.getElementById('default-stats-period')?.value || '6';
-        const statsPeriod = document.getElementById('stats-period');
-        if (statsPeriod) statsPeriod.value = defaultStats;
-        const statsLabels = {'3':'За 3 месяца','6':'За 6 месяцев','12':'За 12 месяцев','all':'За всё время'};
-        const statsTrigger = document.querySelector('#stats-trigger span:first-child');
-        if (statsTrigger) statsTrigger.textContent = statsLabels[defaultStats] || 'За 6 месяцев';
-        renderAnalytics();
-        checkPaydayReminders();
-        setInterval(checkPaydayReminders, 60 * 60 * 1000);
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') checkPaydayReminders();
-        });
-        calendarYear = new Date().getFullYear();
-        calendarMonth = new Date().getMonth();
-        renderCalendar();
+  updateCurrentMonthTotalVisual();
+  renderCalendar();
+  renderAnalytics();
 
-        if (document.getElementById('auto-calc-toggle')?.classList.contains('active')) {
-          enableAutoCalc();
-        }
+  enableAutoCalc();
 
-        window.addEventListener('resize', function() {
-          if (document.getElementById('tab-analytics')?.classList.contains('active')) {
-            renderAnalytics();
-          }
-        });
+  checkPaydayReminders();
+  setInterval(checkPaydayReminders, 3600000);
 
-        window.addEventListener('beforeinstallprompt', (e) => {
-          e.preventDefault();
-          deferredPrompt = e;
-          const installBtn = document.getElementById('install-btn');
-          if (installBtn) installBtn.style.display = 'block';
-        });
+  initSwipeNavigation();
 
-        let lastScrollTop = 0;
-        const navWrapper = document.getElementById('nav-wrapper');
-        document.querySelectorAll('section').forEach(section => {
-          section.addEventListener('scroll', function() {
-            const scrollTop = this.scrollTop;
-            if (scrollTop > lastScrollTop && scrollTop > 50) {
-              if (navWrapper) navWrapper.classList.add('hidden');
-            } else {
-              if (navWrapper) navWrapper.classList.remove('hidden');
-            }
-            lastScrollTop = scrollTop;
-          });
-        });
+  requestAnimationFrame(() => moveNavIndicator(document.querySelector('.nav-item.active')));
 
-        initSwipeNavigation();
-      }
+  const goalAmount = document.getElementById('goal-amount');
+  const goalMonth = document.getElementById('goal-month');
+  if (goalAmount) goalAmount.addEventListener('input', () => { goalAmount.value = cleanNumberInput(goalAmount.value); saveSettings(); });
+  if (goalMonth) goalMonth.addEventListener('change', saveSettings);
+}
 
-      window.addEventListener('online', () => showToast('✅ Интернет восстановлен', 2000));
-      window.addEventListener('offline', () => showToast('⚠️ Нет интернета, но вы можете считать локально', 3000));
+function initTriggers() {
+  // Дни выплат
+  const dayOpts = Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `${i + 1} число` }));
+  const paydayChange = () => { saveSettings(); renderCalendar(); updateCountdown(); };
+  initDropdown(document.getElementById('payday-advance-trigger'), 'payday-advance', dayOpts, paydayChange);
+  initDropdown(document.getElementById('payday-main-trigger'), 'payday-main', dayOpts, paydayChange);
+  initDropdown(document.getElementById('payday-unofficial-trigger'), 'payday-unofficial', dayOpts, paydayChange);
 
-      document.addEventListener('DOMContentLoaded', init);
+  initDropdown(document.getElementById('currency-trigger'), 'currency', CURRENCIES, () => {
+    saveSettings();
+    updateCurrentMonthTotalVisual();
+    renderAnalytics();
+    renderTemplateChips();
+    updateDebtBadge();
+    updateCountdown();
+  });
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('sw.js').catch(err => {
-            console.warn('Не удалось зарегистрировать service worker:', err);
-          });
-        });
-      }
+  const remOpts = REMINDER_OPTIONS.map(v => ({ value: v, label: (v === '0' ? '0 (только в день)' : v + ' ' + (v === '1' ? 'день' : (v >= '2' && v <= '4' ? 'дня' : 'дней'))) }));
+  initDropdown(document.getElementById('reminder-trigger'), 'reminder-days', remOpts, saveSettings);
+
+  const statOpts = STATS_PERIODS.map(p => ({ value: p.value, label: p.label }));
+  initDropdown(document.getElementById('default-stats-trigger'), 'default-stats', statOpts, saveSettings);
+  initDropdown(document.getElementById('stats-trigger'), 'stats-period', statOpts, (opt) => {
+    const t = document.getElementById('stats-trigger');
+    if (t) t.querySelector('span').textContent = opt.label;
+    saveSettings();
+    renderAnalytics();
+  });
+
+  // Дропдауны модалки редактирования
+  initDropdown(document.getElementById('edit-trigger-type'), 'edit-type', KIND_OPTIONS, () => { setEditKindUI(); });
+  initDropdown(document.getElementById('edit-trigger-category'), 'edit-category', CATEGORIES.map(c => ({ value: c, label: c })), () => {});
+}
+
+window.addEventListener('resize', () => {
+  renderAnalytics();
+  moveNavIndicator(document.querySelector('.nav-item.active'));
+});
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+});
+
+// Показ/скрытие нижней навигации при скролле
+let lastScrollTop = 0;
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('nav-wrapper');
+  if (!nav) return;
+  const st = window.scrollY || document.documentElement.scrollTop;
+  if (st > lastScrollTop && st > 50) nav.classList.add('hidden');
+  else nav.classList.remove('hidden');
+  lastScrollTop = st;
+}, { passive: true });
+
+document.addEventListener('DOMContentLoaded', init);

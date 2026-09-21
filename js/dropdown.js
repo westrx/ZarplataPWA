@@ -1,89 +1,51 @@
-'use strict';
-// Кастомный выпадающий список (используется вместо <select>).
+// Кастомные выпадающие списки (рендерятся в портал поверх всего UI)
 
-      function openDropdown(trigger, options, onSelect) {
-        if (!trigger) return;
-        if (activeTrigger === trigger) { closeDropdown(); return; }
-        closeDropdown();
+function initDropdown(triggerElement, hiddenInputId, options, onChangeCallback) {
+  triggerElement.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTrigger && activeTrigger !== triggerElement) closeDropdown(activeTrigger);
+    activeTrigger = triggerElement;
+    const hiddenInput = document.getElementById(hiddenInputId);
+    const currentValue = hiddenInput.value;
+    let dropdown = document.querySelector('.dropdown-portal');
+    if (!dropdown) { dropdown = document.createElement('div'); dropdown.className = 'dropdown-portal'; document.body.appendChild(dropdown); }
+    dropdown.innerHTML = '';
+    options.forEach(opt => {
+      const optionElement = document.createElement('div');
+      optionElement.className = 'option' + (String(opt.value) === String(currentValue) ? ' selected' : '');
+      optionElement.textContent = opt.label;
+      optionElement.onclick = (ev) => {
+        ev.stopPropagation();
+        hiddenInput.value = opt.value;
+        triggerElement.querySelector('.selected-value').textContent = opt.label;
+        closeDropdown(triggerElement);
+        if (onChangeCallback) onChangeCallback(opt);
+      };
+      dropdown.appendChild(optionElement);
+    });
+    const rect = triggerElement.getBoundingClientRect();
+    dropdown.style.top = `${rect.bottom + window.scrollY + 4}px`;
+    dropdown.style.left = `${rect.left + window.scrollX}px`;
+    dropdown.style.minWidth = `${rect.width}px`;
+    dropdown.classList.add('open');
+    triggerElement.querySelector('.arrow').classList.add('open');
+  });
+}
 
-        const rect = trigger.getBoundingClientRect();
-        const portal = document.createElement('div');
-        portal.className = 'dropdown-portal';
-        portal.style.top = (rect.bottom + 6) + 'px';
-        portal.style.left = rect.left + 'px';
-        portal.style.width = Math.max(rect.width, 100) + 'px';
-        portal.style.minWidth = '100px';
+function closeDropdown(trigger) {
+  if (!trigger) { const dp = document.querySelector('.dropdown-portal'); if (dp) dp.classList.remove('open'); return; }
+  const dropdown = document.querySelector('.dropdown-portal');
+  if (dropdown) dropdown.classList.remove('open');
+  const arrow = trigger.querySelector('.arrow');
+  if (arrow) arrow.classList.remove('open');
+  activeTrigger = null;
+}
 
-        options.forEach(opt => {
-          const div = document.createElement('div');
-          div.className = 'option';
-          if (opt.selected) div.classList.add('selected');
-          div.textContent = opt.label;
-          div.dataset.value = opt.value;
-          div.addEventListener('click', function(e) {
-            e.stopPropagation();
-            onSelect(opt.value, opt.label);
-            closeDropdown();
-          });
-          portal.appendChild(div);
-        });
+document.addEventListener('click', (e) => {
+  if (activeTrigger && !e.target.closest('.custom-select-trigger') && !e.target.closest('.dropdown-portal')) closeDropdown(activeTrigger);
+});
 
-        document.body.appendChild(portal);
-        activeTrigger = trigger;
-        const arrow = trigger.querySelector('.arrow');
-        if (arrow) arrow.classList.add('open');
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && activeTrigger) closeDropdown(activeTrigger); });
 
-        function updatePosition() {
-          const newRect = trigger.getBoundingClientRect();
-          portal.style.top = (newRect.bottom + 6) + 'px';
-          portal.style.left = newRect.left + 'px';
-          portal.style.width = Math.max(newRect.width, 100) + 'px';
-        }
-
-        portal._updateHandler = updatePosition;
-        window.addEventListener('scroll', updatePosition, true);
-        window.addEventListener('resize', updatePosition);
-        document.querySelectorAll('section').forEach(section => {
-          section.addEventListener('scroll', updatePosition);
-        });
-
-        requestAnimationFrame(() => { portal.classList.add('open'); });
-
-        const closeHandler = function(e) {
-          if (!portal.contains(e.target) && !trigger.contains(e.target)) {
-            closeDropdown();
-            document.removeEventListener('click', closeHandler);
-          }
-        };
-        setTimeout(() => { document.addEventListener('click', closeHandler); }, 10);
-        portal._closeHandler = closeHandler;
-      }
-
-      function closeDropdown() {
-        if (activeTrigger) {
-          const portal = document.querySelector('.dropdown-portal.open');
-          if (portal) {
-            if (portal._updateHandler) {
-              window.removeEventListener('scroll', portal._updateHandler, true);
-              window.removeEventListener('resize', portal._updateHandler);
-              document.querySelectorAll('section').forEach(section => {
-                section.removeEventListener('scroll', portal._updateHandler);
-              });
-            }
-            if (portal._closeHandler) {
-              document.removeEventListener('click', portal._closeHandler);
-            }
-            portal.classList.remove('open');
-            setTimeout(() => { if (portal.parentNode) portal.parentNode.removeChild(portal); }, 200);
-          }
-          const arrow = activeTrigger.querySelector('.arrow');
-          if (arrow) arrow.classList.remove('open');
-          activeTrigger = null;
-        } else {
-          const portal = document.querySelector('.dropdown-portal');
-          if (portal) {
-            portal.classList.remove('open');
-            setTimeout(() => { if (portal.parentNode) portal.parentNode.removeChild(portal); }, 200);
-          }
-        }
-      }
+window.addEventListener('resize', () => { if (activeTrigger) closeDropdown(activeTrigger); });
+window.addEventListener('scroll', () => { if (activeTrigger) closeDropdown(activeTrigger); }, true);

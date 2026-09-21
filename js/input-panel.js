@@ -1,304 +1,202 @@
-'use strict';
-// Вкладка «Ввод»: быстрый ввод, шторка «Полный расчёт месяца», авторасчёт.
+// Экран быстрого ввода: шаблоны, сплит карта/конверт, типы (ЗП/аванс/отпуск/долг),
+// счётчик до следующей выплаты, бейдж долга, конфетти за рекордный месяц
 
-      function initTriggers() {
-        const triggers = document.querySelectorAll('.custom-select-trigger');
-        if (!triggers.length) return;
-        triggers.forEach(trigger => {
-          trigger.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const id = this.id;
-            let options = [];
-            let onSelect = null;
+function applyKindUI() {
+  const kind = document.getElementById('quick-salary-type').value;
+  const labelCard = document.getElementById('label-card-amount');
+  const rowCash = document.getElementById('row-cash-amount');
+  if (kind === 'vacation') { labelCard.textContent = 'Сумма отпускных'; rowCash.classList.add('hidden-field'); }
+  else if (kind === 'debt') { labelCard.textContent = 'Сумма долга'; rowCash.classList.add('hidden-field'); }
+  else { labelCard.textContent = 'Сумма на карту'; rowCash.classList.remove('hidden-field'); }
+}
 
-            if (id === 'stats-trigger') {
-              const periods = [
-                {value:'3', label:'За 3 месяца'},
-                {value:'6', label:'За 6 месяцев'},
-                {value:'12', label:'За 12 месяцев'},
-                {value:'all', label:'За всё время'}
-              ];
-              options = periods.map(p => ({
-                value: p.value,
-                label: p.label,
-                selected: document.querySelector('#stats-trigger span:first-child').textContent === p.label
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#stats-trigger span:first-child').textContent = label;
-                document.getElementById('stats-period').value = val;
-                renderAnalytics();
-                saveSettings();
-              };
-            } else if (id === 'reminder-trigger') {
-              const days = [0,1,2,3,4,5,6,7];
-              const labels = ['0 (только в день)','1 день','2 дня','3 дня','4 дня','5 дней','6 дней','7 дней'];
-              options = days.map((d, i) => ({
-                value: String(d),
-                label: labels[i],
-                selected: document.querySelector('#reminder-trigger span:first-child').textContent === labels[i]
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#reminder-trigger span:first-child').textContent = label;
-                document.getElementById('reminder-days-before').value = val;
-                saveSettings();
-              };
-            } else if (id === 'currency-trigger') {
-              const currencies = [
-                {value:'₽', label:'₽ (Рубль)'},
-                {value:'$', label:'$ (Доллар)'},
-                {value:'€', label:'€ (Евро)'}
-              ];
-              options = currencies.map(c => ({
-                value: c.value,
-                label: c.label,
-                selected: document.querySelector('#currency-trigger span:first-child').textContent === c.label
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#currency-trigger span:first-child').textContent = label;
-                document.getElementById('currency-select-hidden').value = val;
-                saveSettings();
-                renderAnalytics();
-              };
-            } else if (id === 'default-stats-trigger') {
-              const periods = [
-                {value:'3', label:'За 3 месяца'},
-                {value:'6', label:'За 6 месяцев'},
-                {value:'12', label:'За 12 месяцев'},
-                {value:'all', label:'За всё время'}
-              ];
-              options = periods.map(p => ({
-                value: p.value,
-                label: p.label,
-                selected: document.querySelector('#default-stats-trigger span:first-child').textContent === p.label
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#default-stats-trigger span:first-child').textContent = label;
-                document.getElementById('default-stats-period').value = val;
-                saveSettings();
-              };
-            } else if (id === 'payday-advance-trigger') {
-              const days = ['—',1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-              options = days.map(d => ({
-                value: d === '—' ? '' : String(d),
-                label: String(d),
-                selected: document.querySelector('#payday-advance-trigger span:first-child').textContent === String(d)
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#payday-advance-trigger span:first-child').textContent = label;
-                document.getElementById('payday-advance').value = val;
-                saveSettings();
-                renderCalendar();
-              };
-            } else if (id === 'payday-main-trigger') {
-              const days = ['—',1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-              options = days.map(d => ({
-                value: d === '—' ? '' : String(d),
-                label: String(d),
-                selected: document.querySelector('#payday-main-trigger span:first-child').textContent === String(d)
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#payday-main-trigger span:first-child').textContent = label;
-                document.getElementById('payday-main').value = val;
-                saveSettings();
-                renderCalendar();
-              };
-            } else if (id === 'payday-unofficial-trigger') {
-              const days = ['—',1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31];
-              options = days.map(d => ({
-                value: d === '—' ? '' : String(d),
-                label: String(d),
-                selected: document.querySelector('#payday-unofficial-trigger span:first-child').textContent === String(d)
-              }));
-              onSelect = (val, label) => {
-                document.querySelector('#payday-unofficial-trigger span:first-child').textContent = label;
-                document.getElementById('payday-unofficial').value = val;
-                saveSettings();
-                renderCalendar();
-              };
-            }
+function initQuickCustomSelects() {
+  initDropdown(
+    document.getElementById('trigger-type'),
+    'quick-salary-type',
+    KIND_OPTIONS,
+    () => { applyKindUI(); if (navigator.vibrate) navigator.vibrate(10); }
+  );
+  initDropdown(
+    document.getElementById('trigger-category'),
+    'quick-salary-cat',
+    CATEGORIES.map(c => ({ value: c, label: c })),
+    () => { if (navigator.vibrate) navigator.vibrate(10); }
+  );
+}
 
-            if (options.length && onSelect) {
-              openDropdown(this, options, onSelect);
-            }
-          });
-        });
-      }
+function initNewInputScreen() {
+  const dateInput = document.getElementById('quick-salary-date');
+  dateInput.valueAsDate = new Date();
 
+  document.getElementById('quick-card-amount').addEventListener('input', (e) => { e.target.value = cleanNumberInput(e.target.value); });
+  document.getElementById('quick-cash-amount').addEventListener('input', (e) => { e.target.value = cleanNumberInput(e.target.value); });
 
-      function enableAutoCalc() {
-        const inputs = document.querySelectorAll('#tab-input input[type="text"]');
-        inputs.forEach(input => {
-          input.addEventListener('input', autoCalcHandler);
-        });
-      }
-      function disableAutoCalc() {
-        const inputs = document.querySelectorAll('#tab-input input[type="text"]');
-        inputs.forEach(input => {
-          input.removeEventListener('input', autoCalcHandler);
-        });
-      }
-      function autoCalcHandler() {
-        // Живой предпросмотр расчёта убрали вместе со старым интерфейсом.
-        // Сохранение теперь всегда идёт через явные кнопки
-        // «Добавить выплату» / «Сохранить сводку за месяц».
-      }
+  document.getElementById('btn-submit-stream').addEventListener('click', () => {
+    const kind = document.getElementById('quick-salary-type').value;
+    const card = parseNumberFromInput('quick-card-amount');
+    const cash = (kind === 'main' || kind === 'advance') ? parseNumberFromInput('quick-cash-amount') : 0;
+    const dateEl = document.getElementById('quick-salary-date');
+    if (!dateEl.value) { showToast('Укажите дату', 2000); return; }
+    if (kind === 'debt') { if (card <= 0) { showToast('Введите сумму долга', 2000); return; } }
+    else if (card + cash <= 0) { showToast('Введите сумму', 2000); return; }
 
-      function initNewInputScreen() {
-        const dateInput = document.getElementById('quick-salary-date');
-        if (dateInput) dateInput.valueAsDate = new Date();
+    const category = document.getElementById('quick-salary-cat').value;
+    const d = parseLocalDate(dateEl.value) || new Date();
+    const wasBest = getBestMonthTotal(d.getFullYear(), d.getMonth());
 
-        document.getElementById('btn-submit-stream').addEventListener('click', () => {
-          const amount = parseFloat(document.getElementById('quick-salary-amount').value.replace(',', '.')) || 0;
-          if (amount <= 0) return showToast('Введите сумму', 1500);
-          saveQuickPaymentToHistory(amount, document.getElementById('quick-salary-type').value, document.getElementById('quick-salary-date').value, document.getElementById('quick-salary-cat').value);
-          document.getElementById('quick-salary-amount').value = '';
-          updateCurrentMonthTotalVisual();
-          renderAnalytics();
-          showToast('Выплата добавлена', 2000);
-        });
+    saveQuickPaymentToHistory(card, cash, kind, dateEl.value, category, '');
 
-        updateCurrentMonthTotalVisual();
-      }
+    document.getElementById('quick-card-amount').value = '';
+    document.getElementById('quick-cash-amount').value = '';
+    updateCurrentMonthTotalVisual();
+    renderAnalytics();
+    renderCalendar();
+    updateDebtBadge();
+    updateCountdown();
 
+    if (kind !== 'debt') {
+      const mt = getMonthTotal(d.getFullYear(), d.getMonth());
+      if (wasBest > 0 && mt > wasBest) launchConfetti();
+    }
+    if (navigator.vibrate) navigator.vibrate(30);
+    showToast(kind === 'debt' ? 'Долг записан' : 'Выплата добавлена', 2000);
+  });
 
-      function initQuickCustomSelects() {
-        const triggerType = document.getElementById('trigger-type');
-        if (triggerType) {
-          const typeOptions = [
-            { value: 'main', label: 'Выплата (ЗП)' },
-            { value: 'advance', label: 'Аванс' },
-            { value: 'vacation', label: 'Отпускные' },
-            { value: 'unofficial', label: 'В конверте' }
-          ];
-          triggerType.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const currentVal = document.getElementById('quick-salary-type').value;
-            const opts = typeOptions.map(opt => ({ ...opt, selected: opt.value === currentVal }));
-            openDropdown(this, opts, (val, label) => {
-              this.querySelector('.selected-value').textContent = label;
-              document.getElementById('quick-salary-type').value = val;
-              saveSettings();
-            });
-          });
-        }
+  applyKindUI();
+  renderTemplateChips();
+  updateDebtBadge();
+  updateCountdown();
+}
 
-        const triggerCat = document.getElementById('trigger-category');
-        if (triggerCat) {
-          const catOptions = [
-            { value: 'Основная', label: 'Основная' },
-            { value: 'Подработка', label: 'Подработка' },
-            { value: 'Премия', label: 'Премия' },
-            { value: 'Другое', label: 'Другое' }
-          ];
-          triggerCat.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const currentVal = document.getElementById('quick-salary-cat').value;
-            const opts = catOptions.map(opt => ({ ...opt, selected: opt.value === currentVal }));
-            openDropdown(this, opts, (val, label) => {
-              this.querySelector('.selected-value').textContent = label;
-              document.getElementById('quick-salary-cat').value = val;
-              saveSettings();
-            });
-          });
-        }
-      }
+// Шаблоны: быстрые чипы над формой ввода
+function renderTemplateChips() {
+  const c = document.getElementById('template-chips');
+  if (!c) return;
+  const tpls = getTemplates().filter(t => t.name && parseFloat(t.amount) > 0);
+  c.innerHTML = '';
+  tpls.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'template-chip';
+    b.textContent = `${t.name} · ${formatMoney(parseFloat(t.amount), getCurrency())}`;
+    b.onclick = () => {
+      document.getElementById('quick-card-amount').value = t.amount;
+      const cat = t.category || 'Основная';
+      document.getElementById('quick-salary-cat').value = cat;
+      const trg = document.getElementById('trigger-category');
+      if (trg) trg.querySelector('.selected-value').textContent = cat;
+      if (navigator.vibrate) navigator.vibrate(10);
+    };
+    c.appendChild(b);
+  });
+}
 
+function updateDebtBadge() {
+  const el = document.getElementById('debt-badge');
+  if (!el) return;
+  const debt = getOpenDebt(getHistory());
+  if (debt > 0) {
+    el.textContent = 'Долг работодателя: ' + formatMoney(debt, getCurrency());
+    el.classList.remove('hidden-field');
+  } else {
+    el.classList.add('hidden-field');
+  }
+}
 
-      const EDIT_TYPE_OPTIONS = [
-        { value: 'main', label: 'Выплата (ЗП)' },
-        { value: 'advance', label: 'Аванс' },
-        { value: 'vacation', label: 'Отпускные' },
-        { value: 'unofficial', label: 'В конверте' }
-      ];
-      const EDIT_CATEGORY_OPTIONS = [
-        { value: 'Основная', label: 'Основная' },
-        { value: 'Подработка', label: 'Подработка' },
-        { value: 'Премия', label: 'Премия' },
-        { value: 'Другое', label: 'Другое' }
-      ];
+function updateCountdown() {
+  const el = document.getElementById('payday-countdown');
+  if (!el) return;
+  const pd = getPaydaySettings();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const candidates = [];
+  const addCand = (day, label) => {
+    if (!day) return;
+    let m = now.getMonth(), y = now.getFullYear();
+    let actual = getActualPayday(day, m, y);
+    let d = new Date(y, m, actual);
+    if (d < today) { m++; if (m > 11) { m = 0; y++; } actual = getActualPayday(day, m, y); d = new Date(y, m, actual); }
+    candidates.push({ d, label });
+  };
+  addCand(pd.main, 'ЗП');
+  addCand(pd.advance, 'аванс');
+  addCand(pd.cash, 'конверт');
+  if (!candidates.length) { el.textContent = ''; return; }
+  candidates.sort((a, b) => a.d - b.d);
+  const days = Math.round((candidates[0].d - today) / 86400000);
+  el.textContent = days === 0 ? `Сегодня: ${candidates[0].label}` : `До выплаты (${candidates[0].label}): ${days} дн`;
+}
 
-      function closeEditModal() {
-        const modal = document.getElementById('edit-modal');
-        if (modal) modal.classList.add('hidden-field');
-        editingIndex = null;
-      }
+// Модалка редактирования записи
+function setEditKindUI() {
+  const kind = document.getElementById('edit-type').value;
+  const label = document.getElementById('label-edit-amount');
+  const rowCash = document.getElementById('row-edit-cash');
+  if (kind === 'vacation') { label.textContent = 'Сумма отпускных'; rowCash.classList.add('hidden-field'); }
+  else if (kind === 'debt') { label.textContent = 'Сумма долга'; rowCash.classList.add('hidden-field'); }
+  else { label.textContent = 'На карту'; rowCash.classList.remove('hidden-field'); }
+}
 
-      // Открывает модалку редактирования, предзаполняя поля данными записи.
-      function openEditModal(index, item) {
-        editingIndex = index;
-        document.getElementById('edit-amount').value = item.total || '';
-        document.getElementById('edit-date').value = item.receivedDate || todayLocalISO();
+function openEditModal(index) {
+  const history = getHistory();
+  const item = history[index];
+  if (!item) return;
+  editingIndex = index;
+  const isCashKind = (item.kind === 'main' || item.kind === 'advance');
+  document.getElementById('edit-amount').value = isCashKind ? String(item.card || 0) : String((item.vacation || 0) + (item.debt || 0) + (item.card || 0));
+  document.getElementById('edit-cash').value = String(item.cash || 0);
+  document.getElementById('edit-type').value = item.kind || 'main';
+  document.getElementById('edit-category').value = item.category || 'Основная';
+  document.getElementById('edit-date').value = item.receivedDate || '';
+  const tt = document.getElementById('edit-trigger-type');
+  const tk = KIND_OPTIONS.find(k => k.value === (item.kind || 'main'));
+  if (tt && tk) tt.querySelector('.selected-value').textContent = tk.label;
+  const tc = document.getElementById('edit-trigger-category');
+  if (tc) tc.querySelector('.selected-value').textContent = item.category || 'Основная';
+  setEditKindUI();
+  const modal = document.getElementById('edit-modal');
+  modal.classList.remove('hidden-field');
+  modal.classList.add('modal-overlay');
+}
 
-        let type = 'main';
-        if (item.hasAdvance) type = 'advance';
-        else if (item.hasVacation) type = 'vacation';
-        else if (item.hasUnofficial) type = 'unofficial';
-        const typeLabel = (EDIT_TYPE_OPTIONS.find(o => o.value === type) || EDIT_TYPE_OPTIONS[0]).label;
-        document.getElementById('edit-type').value = type;
-        document.querySelector('#edit-trigger-type .selected-value').textContent = typeLabel;
+function closeEditModal() {
+  const modal = document.getElementById('edit-modal');
+  modal.classList.add('hidden-field');
+  modal.classList.remove('modal-overlay');
+  editingIndex = null;
+}
 
-        const category = item.category || 'Основная';
-        document.getElementById('edit-category').value = category;
-        document.querySelector('#edit-trigger-category .selected-value').textContent = category;
+function initEditModal() {
+  document.getElementById('btn-close-edit').addEventListener('click', closeEditModal);
+  document.getElementById('edit-amount').addEventListener('input', (e) => { e.target.value = cleanNumberInput(e.target.value); });
+  document.getElementById('edit-cash').addEventListener('input', (e) => { e.target.value = cleanNumberInput(e.target.value); });
 
-        document.getElementById('edit-modal').classList.remove('hidden-field');
-      }
+  document.getElementById('btn-save-edit').addEventListener('click', () => {
+    if (editingIndex === null) return;
+    const kind = document.getElementById('edit-type').value;
+    const card = parseNumberFromInput('edit-amount');
+    const cash = (kind === 'main' || kind === 'advance') ? parseNumberFromInput('edit-cash') : 0;
+    const dateEl = document.getElementById('edit-date');
+    if (!dateEl.value) { showToast('Укажите дату', 2000); return; }
+    if (kind === 'debt') { if (card <= 0) { showToast('Введите сумму долга', 2000); return; } }
+    else if (card + cash <= 0) { showToast('Введите сумму', 2000); return; }
+    updateHistoryRecord(editingIndex, card, cash, kind, dateEl.value, document.getElementById('edit-category').value);
+    closeEditModal();
+    updateCurrentMonthTotalVisual();
+    renderAnalytics();
+    renderCalendar();
+    updateDebtBadge();
+    updateCountdown();
+    showToast('Запись обновлена', 2000);
+  });
 
-      function initEditModal() {
-        const triggerType = document.getElementById('edit-trigger-type');
-        if (triggerType) {
-          triggerType.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const currentVal = document.getElementById('edit-type').value;
-            const opts = EDIT_TYPE_OPTIONS.map(opt => ({ ...opt, selected: opt.value === currentVal }));
-            openDropdown(this, opts, (val, label) => {
-              this.querySelector('.selected-value').textContent = label;
-              document.getElementById('edit-type').value = val;
-            });
-          });
-        }
+  document.getElementById('btn-delete-edit').addEventListener('click', () => {
+    if (editingIndex === null) return;
+    const idx = editingIndex;
+    closeEditModal();
+    deleteHistoryItem(idx);
+  });
+}
 
-        const triggerCat = document.getElementById('edit-trigger-category');
-        if (triggerCat) {
-          triggerCat.addEventListener('click', function(e) {
-            e.stopPropagation();
-            const currentVal = document.getElementById('edit-category').value;
-            const opts = EDIT_CATEGORY_OPTIONS.map(opt => ({ ...opt, selected: opt.value === currentVal }));
-            openDropdown(this, opts, (val, label) => {
-              this.querySelector('.selected-value').textContent = label;
-              document.getElementById('edit-category').value = val;
-            });
-          });
-        }
-
-        document.getElementById('btn-close-edit').addEventListener('click', (e) => {
-          e.preventDefault();
-          closeEditModal();
-        });
-
-        document.getElementById('btn-save-edit').addEventListener('click', (e) => {
-          e.preventDefault();
-          const amount = parseNumberFromInput(document.getElementById('edit-amount').value);
-          if (amount <= 0) return showToast('Введите сумму', 1500);
-          const date = document.getElementById('edit-date').value || todayLocalISO();
-          const type = document.getElementById('edit-type').value;
-          const category = document.getElementById('edit-category').value;
-          updateHistoryRecord(editingIndex, amount, type, date, category);
-          closeEditModal();
-          updateCurrentMonthTotalVisual();
-          renderAnalytics();
-          renderCalendar();
-          showToast('Запись обновлена', 2000);
-        });
-
-        document.getElementById('btn-delete-edit').addEventListener('click', (e) => {
-          e.preventDefault();
-          const index = editingIndex;
-          closeEditModal();
-          deleteHistoryItem(index);
-          updateCurrentMonthTotalVisual();
-          renderCalendar();
-          showToast('Запись удалена', 2000);
-        });
-      }
-
+function enableAutoCalc() {}
+function disableAutoCalc() {}

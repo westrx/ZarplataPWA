@@ -1,79 +1,74 @@
-'use strict';
-// Действия над историей: очистка формы, удаление/редактирование записи,
-// экспорт/импорт/очистка истории.
+// Тосты, экспорт/импорт JSON, CSV-кнопка, очистка, удаление записи,
+// виджет "уже учтено в этом месяце"
 
-      function updateCurrentMonthTotalVisual() {
-        const now = new Date();
-        const month = now.getMonth(), year = now.getFullYear();
-        const history = getHistory();
-        let total = 0;
-        history.forEach(item => {
-          const d = new Date(item.receivedDate);
-          if (d.getMonth() === month && d.getFullYear() === year) total += item.total || 0;
-        });
-        document.getElementById('current-month-total').textContent = formatMoney(total, document.getElementById('currency-select-hidden')?.value || '₽');
-      }
+function showToast(message, duration = 3000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), duration);
+}
 
+function updateCurrentMonthTotalVisual() {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  const currency = getCurrency();
+  let total = 0;
+  getHistory().forEach(item => {
+    const d = recordDate(item);
+    if (d && !isNaN(d) && d.getMonth() === month && d.getFullYear() === year) total += recordReceived(item);
+  });
+  document.getElementById('current-month-total').textContent = formatMoney(total, currency);
+}
 
-      window.deleteHistoryItem = function(index) {
-        const history = getHistory();
-        if (index >= 0 && index < history.length) {
-          history.splice(index, 1);
-          setHistory(history);
-          renderAnalytics();
-        }
-      };
+function exportHistory() {
+  const data = getHistory();
+  const dataStr = JSON.stringify(data, null, 2);
+  downloadFile(`salary-history-${new Date().toISOString().split('T')[0]}.json`, dataStr, 'application/json');
+  showToast('История экспортирована', 2000);
+}
 
+function refreshAllAfterDataChange() {
+  updateCurrentMonthTotalVisual();
+  renderAnalytics();
+  renderCalendar();
+  updateDebtBadge();
+  updateCountdown();
+}
 
-      window.editHistoryItem = function(index) {
-        const history = getHistory();
-        if (index < 0 || index >= history.length) return;
-        openEditModal(index, history[index]);
-      };
+function importHistory(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { showToast('Неверный формат файла', 3000); return; }
+      setHistory(data.map(normalizeRecord).filter(Boolean));
+      refreshAllAfterDataChange();
+      showToast(`Импортировано записей: ${data.length}`, 2000);
+    } catch (err) {
+      showToast('Ошибка чтения файла', 3000);
+    } finally {
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
 
+function clearHistory() {
+  if (confirm('Очистить всю историю? Это действие нельзя отменить.')) {
+    setHistory([]);
+    refreshAllAfterDataChange();
+    showToast('История очищена', 2000);
+  }
+}
 
-      window.exportHistory = function() {
-        const history = getHistory();
-        if (history.length === 0) { showToast('История пуста', 2000); return; }
-        const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `salary_history_${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      };
-
-
-      window.importHistory = function(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            const data = JSON.parse(e.target.result);
-            if (Array.isArray(data)) {
-              setHistory(data);
-              renderAnalytics();
-              showToast('История импортирована', 2000);
-            } else { showToast('Неверный формат файла', 2500); }
-          } catch { showToast('Ошибка при чтении файла', 2500); }
-        };
-        reader.readAsText(file);
-        event.target.value = '';
-      };
-
-
-      window.clearHistory = function() {
-        if (confirm('Вы точно хотите очистить всю историю?')) {
-          setHistory([]);
-          renderAnalytics();
-          updateCurrentMonthTotalVisual();
-          renderCalendar();
-          showToast('История очищена', 2000);
-          editingIndex = null;
-        }
-      };
-
+function deleteHistoryItem(index) {
+  const history = getHistory();
+  if (index < 0 || index >= history.length) return;
+  history.splice(index, 1);
+  setHistory(history);
+  refreshAllAfterDataChange();
+  showToast('Запись удалена', 2000);
+}
